@@ -18,6 +18,13 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from dash.development.base_component import Component
+
+# Google Web Credentials
+import json
+import base64
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 # 'data/~$bmhc_data_2024_cleaned.xlsx'
 # print('System Version:', sys.version)
 # -------------------------------------- DATA ------------------------------------------- #
@@ -25,23 +32,51 @@ from dash.development.base_component import Component
 current_dir = os.getcwd()
 current_file = os.path.basename(__file__)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = 'data/Navigation_Responses.xlsx'
-file_path = os.path.join(script_dir, data_path)
-data = pd.read_excel(file_path)
+# data_path = 'data/Navigation_Responses.xlsx'
+# file_path = os.path.join(script_dir, data_path)
+# data = pd.read_excel(file_path)
+# df = data.copy()
+
+# Define the Google Sheets URL
+sheet_url = "https://docs.google.com/spreadsheets/d/1Vi5VQWt9AD8nKbO78FpQdm6TrfRmg0o7az77Hku2i7Y/edit#gid=78776635"
+
+# Define the scope
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# Load credentials
+encoded_key = os.getenv("GOOGLE_CREDENTIALS")
+
+if encoded_key:
+    json_key = json.loads(base64.b64decode(encoded_key).decode("utf-8"))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
+else:
+    creds_path = r"C:\Users\CxLos\OneDrive\Documents\BMHC\Data\bmhc-timesheet-4808d1347240.json"
+    if os.path.exists(creds_path):
+        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    else:
+        raise FileNotFoundError("Service account JSON file not found and GOOGLE_CREDENTIALS is not set.")
+
+# Authorize and load the sheet
+client = gspread.authorize(creds)
+sheet = client.open_by_url(sheet_url)
+worksheet = sheet.get_worksheet(0)  # ✅ This grabs the first worksheet
+data = pd.DataFrame(worksheet.get_all_records())
+# data = pd.DataFrame(client.open_by_url(sheet_url).get_all_records())
 df = data.copy()
+
+# Get the reporting month:
+current_month = datetime(2025, 3, 1).strftime("%B")
 
 df.columns = df.columns.str.strip()
 
-# Create new database named 'df_q1' that only includes columns where "Date of Activity:" is between 202-10-01 and 2024-12-31:
-df['Date of activity:'] = pd.to_datetime(df['Date of activity:'], format='%m-%d-%Y', errors='coerce')
+# Filtered df where 'Date of Activity:' is between 2025-01-01 and 2025-03-31
+df['Date of Activity'] = pd.to_datetime(df['Date of Activity'], errors='coerce')
+df = df[(df['Date of Activity'] >= '2025-1-01') & (df['Date of Activity'] <= '2025-3-31')]
+df['Month'] = df['Date of Activity'].dt.month_name()
 
-df = df[(df['Date of activity:'] >= '2024-10-01') & (df['Date of activity:'] <= '2024-12-31')]
-
-df['Month'] = df['Date of activity:'].dt.month_name()
-
-df_oct = df[df['Month'] == 'October']
-df_nov = df[df['Month'] == 'November']
-df_dec = df[df['Month'] == 'December']
+df_1 = df[df['Month'] == 'January']
+df_2 = df[df['Month'] == 'February']
+df_3 = df[df['Month'] == 'March']
 
 # Extract the month name
 # df['Month'] = df['Date of activity:'].dt.month_name()
@@ -51,7 +86,7 @@ color_sequence = px.colors.qualitative.Plotly
 
 # print(df.head())
 # print('Total entries: ', len(df))
-# print('Column Names: \n', df_q1.columns)
+print('Column Names: \n', df.columns)
 # print('DF Shape:', df.shape)
 # print('Dtypes: \n', df.dtypes)
 # print('Info:', df.info())
@@ -63,106 +98,40 @@ color_sequence = px.colors.qualitative.Plotly
 
 # ================================= Columns Navigation ================================= #
 
-# Column Names: 
-#  Index([
-#     'Timestamp', 
-#     'Date of activity:', 
-#     'Person filling out this form:',
-#     'Activity duration (minutes):', 
-#     'Location Encountered:',
-#     'Individual's Name:', 
-#     'Individual's Date of Birth:',
-#     'Individual's Insurance Status:', 
-#     'Individual's street address:',
-#     'City:', 
-#     'ZIP Code:', 
-#     'County:', 
-#     'Type of support given:',
-#     'Provide brief support description:', 
-#     'Individual's Status:',
-#     'HMIS SPID Number:', 
-#     'MAP Card Number', 
-#     'Gender:', 
-#     'Race/Ethnicity:'
-# ],
-# dtype='object')
-
-# ================================= Columns FH ================================= #
-
-# Column Names: 
-#  Index([
-#         'screener_id', 
-#         'site',
-#         'program', 
-#         'submitted_by', 
-#         'submitted_for',
-#         'created_at', 
-#         'seeker_name',
-#         'Status', 
-#         'referral_id',
-#         'Are you Hispanic Latino/a or of Spanish origin?',
-#         'Are you a veteran of the US Armed Forces?', 
-#         'Birthdate', 
-#         'Client age',
-#         'Do you utilize any of these benefits or social services? Check all that       apply:',
-#         'Email Address', 
-#         'First Name',
-#         'Gender',
-#         'How can BMHC support you today?',
-#         'Last Name', 'Phone Number',
-#         'Preferred Language', 
-#         'Race/Ethnicity',
-#         'What is your living situation?',
-#         'ZIP Code'],
-#       dtype='object')
+nav_columns = [
+    'Timestamp',
+    'Date of Activity', 
+    'Person submitting this form:',
+    'Activity Duration (minutes):',
+    'Total travel time (minutes):',
+    'Location Encountered:', 
+    "Individual's First Name:",  # Fixed single quote
+    "Individual's Date of Birth:",  # Fixed single quote
+    "Individual's Insurance Status:",  # Fixed single quote
+    "Individual's street address:",  # Fixed single quote
+    'City:', 
+    'ZIP Code:',
+    'County:',
+    'Type of support given:', 
+    'Provide brief support description:',
+    "Individual's Status:",  # Fixed single quote
+    'HMIS SPID Number:',
+    'MAP Card Number',
+    'Gender:',
+    'Race/Ethnicity:', 
+    'Direct Client Assistance Amount:',
+    'Column 21', 
+    "Individual's Last Name:",  # Fixed single quote
+    'Any recent or planned changes to BMHC lead services or programs?',
+    'Month'
+]
 
 # ================================= Missing Values ================================= #
 
 # missing = df_q1.isnull().sum()
 # print('Columns with missing values before fillna: \n', missing[missing > 0])
 
-# Missing Values:
-
-# Individual's Insurance Status:      1
-# Individual's street address:        2
-# City:                               1
-# ZIP Code:                           2
-# County:                             3
-# HMIS SPID Number:                 154
-# MAP Card Number                   158                                26
-
 # ============================== Checking Duplicates ========================== #
-
-# Check for duplicate columns
-# duplicate_columns = df.columns[df.columns.duplicated()].tolist()
-# print(f"Duplicate columns found: {duplicate_columns}")
-# if duplicate_columns:
-#     print(f"Duplicate columns found: {duplicate_columns}")
-
-# Check for duplicate rows
-# duplicate_rows = df[df.duplicated(subset=['First Name'], keep=False)]
-# print(f"Duplicate rows found: \n {duplicate_rows}")
-
-# Get the count of duplicate 'First Name' values
-# duplicate_count = df['First Name'].duplicated(keep=False).sum()
-
-# Print the count of duplicate 'First Name' values
-# print(f"Count of duplicate 'First Name' values: {duplicate_count}")
-
-# Remove duplicate rows based on 'First Name'
-# df = df.drop_duplicates(subset=['First Name'], keep='first')
-
-# Verify removal of duplicates
-# duplicate_count_after_removal = df['First Name'].duplicated(keep=False).sum()
-# print(f"Count of duplicate 'First Name' values after removal: {duplicate_count_after_removal}")
-
-# # Merge the "Zip Code" columns if they exist
-# if 'Zip Code' in df.columns:
-#     zip_code_columns = [col for col in df.columns if col == 'Zip Code']
-#     if len(zip_code_columns) > 1:
-#         df['Zip Code'] = df[zip_code_columns[0]].combine_first(df[zip_code_columns[1]])
-#         # Drop the duplicate "Zip Code" columns, keeping only the merged one
-#         df = df.loc[:, ~df.columns.duplicated()]
 
 # ============================== Data Preprocessing ========================== #
 
@@ -172,6 +141,18 @@ color_sequence = px.colors.qualitative.Plotly
 # if duplicate_columns:
 #     print(f"Duplicate columns found: {duplicate_columns}")
 
+df.rename(
+    columns={
+        # "Person submitting this form:": "Person",
+        "Activity Duration (minutes):": "Minutes",
+        # "Total travel time (minutes):": "Travel Time",
+        # "Location Encountered:": "Location",
+        # "Individual's Insurance Status:": "Insurance",
+        # "Type of support given:": "Support",
+        # "Individual's Status:": "Status",
+    }, 
+inplace=True)
+
 # Fill Missing Values for df
 # List of columns to fill with 'Unknown'
 columns_to_fill = [
@@ -180,7 +161,8 @@ columns_to_fill = [
     "City:",
     "County:",
     "Gender:",
-    "Race/Ethnicity:"
+    "Race/Ethnicity:",
+    "Individual's street address:"
 ]
 
 # Fill missing values for categorical columns with 'Unknown'
@@ -195,7 +177,56 @@ df['MAP Card Number'] = df['MAP Card Number'].fillna(-1)
 # fill missing values for "City:" with the most frequent value
 df['City:'] = df['City:'].fillna(df['City:'].mode()[0])
 df['County:'] = df['County:'].fillna(df['County:'].mode()[0])
-df["Individual's street address:"] = df["Individual's street address:"].fillna('Unknown')
+
+# Get the reporting quarter:
+def get_custom_quarter(date_obj):
+    month = date_obj.month
+    if month in [10, 11, 12]:
+        return "Q1"  # October–December
+    elif month in [1, 2, 3]:
+        return "Q2"  # January–March
+    elif month in [4, 5, 6]:
+        return "Q3"  # April–June
+    elif month in [7, 8, 9]:
+        return "Q4"  # July–September
+
+# Reporting Quarter (use last month of the quarter)
+report_date = datetime(2025, 3, 1)  # Example report date for Q2 (Jan–Mar)
+month = report_date.month
+report_year = report_date.year
+current_quarter = get_custom_quarter(report_date)
+# print(f"Reporting Quarter: {current_quarter}")
+
+# Adjust the quarter calculation for custom quarters
+if month in [10, 11, 12]:
+    quarter = 1  # Q1: October–December
+elif month in [1, 2, 3]:
+    quarter = 2  # Q2: January–March
+elif month in [4, 5, 6]:
+    quarter = 3  # Q3: April–June
+elif month in [7, 8, 9]:
+    quarter = 4  # Q4: July–September
+
+# Define a mapping for months to their corresponding quarter
+quarter_months = {
+    1: ['October', 'November', 'December'],  # Q1
+    2: ['January', 'February', 'March'],    # Q2
+    3: ['April', 'May', 'June'],            # Q3
+    4: ['July', 'August', 'September']      # Q4
+}
+
+# Get the months for the current quarter
+months_in_quarter = quarter_months[quarter]
+
+# Calculate start and end month indices for the quarter
+all_months = [
+    'January', 'February', 'March', 
+    'April', 'May', 'June',
+    'July', 'August', 'September', 
+    'October', 'November', 'December'
+]
+start_month_idx = (quarter - 1) * 3
+month_order = all_months[start_month_idx:start_month_idx + 3]
 
 # -------------------------- Clients Served DF ------------------------- #
 
@@ -216,51 +247,103 @@ clients_served_nov = len(clients_nov)
 clients_dec = df[df['Month'] == 'December']
 clients_served_dec = len(clients_dec)
 
+clients = []
+for month in months_in_quarter:
+    clients_in_month = df[df['Month'] == month].shape[0]  # Count the number of rows for each month
+    clients.append(clients_in_month)
+    print(f'Clients Served in {month}:', clients_in_month)
+
 # Create a DataFrame with the results for plotting
-df_clients_q1 = pd.DataFrame(
+df_clients = pd.DataFrame(
     {
-    'Month': ['October', 'November', 'December'],
-    'Clients Served': [clients_served_oct, clients_served_nov, clients_served_dec]
+    'Month': months_in_quarter,
+    'Clients Served': clients
     }
 )
 
 # print(df_clients_q1)
 
 clients_served_fig = px.bar(
-    df_clients_q1, 
+    df_clients, 
     x='Month', 
     y='Clients Served',
-    title='Total Clients Served Each Month (Q1)',
     labels={'Clients Served': 'Number of Clients'},
     color='Month',  # Color the bars by month
     text='Clients Served',  # Display the value on top of the bars
 ).update_layout(
-    title_x=0.5,  # Center the title
-    height=500,
+    title_x=0.5,
+    xaxis_title='Month',
+    yaxis_title='Count',
+    height=600,  # Adjust graph height
+    title=dict(
+        text= f'{current_quarter} Clients Served by Month',
+        x=0.5, 
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black',
+            )
+    ),
     font=dict(
         family='Calibri',
-        size=14,
+        size=17,
         color='black'
-    )
+    ),
+    xaxis=dict(
+        title=dict(
+            text=None,
+            # text="Month",
+            font=dict(size=20),  # Font size for the title
+        ),
+        tickmode='array',
+        tickvals=df_clients['Month'].unique(),
+        tickangle=0  # Rotate x-axis labels for better readability
+    ),
+).update_traces(
+    texttemplate='%{text}',  # Display the count value above bars
+    textfont=dict(size=20),  # Increase text size in each bar
+    textposition='auto',  # Automatically position text above bars
+    textangle=0, # Ensure text labels are horizontal
+    hovertemplate=(  # Custom hover template
+        '<b>Name</b>: %{label}<br><b>Count</b>: %{y}<extra></extra>'  
+    ),
+)
+
+clients_pie = px.pie(
+    df_clients,
+    names='Month',
+    values='Clients Served',
+    color='Month',
+    height=550
+).update_layout(
+    title=dict(
+        x=0.5,
+        text=f'{current_quarter} Ratio of Clients Served',  # Title text
+        font=dict(
+            size=35,  # Increase this value to make the title bigger
+            family='Calibri',  # Optional: specify font family
+            color='black'  # Optional: specify font color
+        ),
+    ),  # Center-align the title
+    margin=dict(
+        l=0,  # Left margin
+        r=0,  # Right margin
+        t=100,  # Top margin
+        b=0   # Bottom margin
+    )  # Add margins around the chart
+).update_traces(
+    rotation=180,  # Rotate pie chart 90 degrees counterclockwise
+    textfont=dict(size=19),  # Increase text size in each bar
+    textinfo='value+percent',
+    # texttemplate='<br>%{percent:.0%}',  # Format percentage as whole numbers
+    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
 # -------------------------- Activity Duration DF ------------------------- #
 
-df_duration = df['Activity duration (minutes):'].sum()/60
+df_duration = df['Minutes'].sum()/60
 df_duration = round(df_duration)  # Round to the nearest whole number
 # print('Activity Duration:', df_duration/60, 'hours')
-
-# Duration in October:
-df_duration_oct = df_oct['Activity duration (minutes):'].sum()/60
-df_duration_oct = round(df_duration_oct)  # Round to the nearest whole number
-
-# Duration in November:
-df_duration_nov = df_nov['Activity duration (minutes):'].sum()/60
-df_duration_nov = round(df_duration_nov)  # Round to the nearest whole number
-
-# Duration in December:
-df_duration_dec = df_dec['Activity duration (minutes):'].sum()/60
-df_duration_dec = round(df_duration_dec)  # Round to the nearest whole number
 
 # -------------------- Age DF ------------------- #
 
@@ -310,10 +393,10 @@ def categorize_age(age):
 df['Age_Group'] = df['Client Age'].apply(categorize_age)
 
 # Extract the month name
-df['Month'] = df['Date of activity:'].dt.month_name()
+df['Month'] = df['Date of Activity'].dt.month_name()
 
 # Filter for October, November, December
-df_q_age = df[df['Month'].isin(['October', 'November', 'December'])]
+df_q_age = df[df['Month'].isin(['January', 'February', 'March'])]
 
 # Group data by Month and Age Group
 df_age_counts = (
@@ -323,7 +406,7 @@ df_age_counts = (
 )
 
 # Sort months and age groups
-month_order = ['October', 'November', 'December']
+month_order = ['January', 'February', 'March']
 
 age_order = [
     # '10-19', 
@@ -494,10 +577,10 @@ age_pie = px.pie(
 # ------------------------ Type of Support Given DF --------------------------- #
 
 # DataFrame for columns "Type of support given:" and "Date of activity:"
-df_support = df[['Type of support given:', 'Date of activity:']]
+df_support = df[['Type of support given:', 'Date of Activity']]
 
 # # Extract the month from the 'Date of activity:' column
-df_support['Month'] = df_support['Date of activity:'].dt.month_name()
+df_support['Month'] = df_support['Date of Activity'].dt.month_name()
 
 # # Filter data for October, November, and December
 df_support_q = df_support[df_support['Month'].isin(['October', 'November', 'December'])]
@@ -677,15 +760,12 @@ custom_colors = {
 }
 
 # Ensure the 'Date of activity:' column is in datetime format
-df['Date of activity:'] = pd.to_datetime(df['Date of activity:'], errors='coerce')
+# df['Date of activity:'] = pd.to_datetime(df['Date of activity:'], errors='coerce')
 
 # Clean and preprocess the 'Individual's Insurance Status:' column
 df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].str.strip()
 df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].replace('MAP 000', 'MAP 100')
 df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].replace('Did not disclose.', 'NONE')
-
-# Extract the month name
-df['Month'] = df['Date of activity:'].dt.month_name()
 
 # Filter data for October, November, and December
 df_q_insurance = df[df['Month'].isin(['October', 'November', 'December'])]
@@ -698,10 +778,10 @@ df_insurance_counts = (
 )
 
 # Sort months in the desired order
-month_order = ['October', 'November', 'December']
+# month_order = ['October', 'November', 'December']
 df_insurance_counts['Month'] = pd.Categorical(
     df_insurance_counts['Month'], 
-    categories=month_order, 
+    categories=months_in_quarter, 
     ordered=True
 )
 
@@ -813,7 +893,6 @@ insurance_totals_fig = px.bar(
 )
 
 # Heatmap for Insurance Status:
-# Create a pivot table for the heatmap
 df_insurance_pivot = df_insurance_counts.pivot(
     index='Month',
     columns="Individual's Insurance Status:",
@@ -894,12 +973,6 @@ df['Location Encountered:'] = df['Location Encountered:'].replace({
     'CFV': 'Community First Village',
     'BMHC': 'Black Men\'s Health Clinic'
 })
-
-# Convert 'Date of activity:' to datetime
-df['Date of activity:'] = pd.to_datetime(df['Date of activity:'])
-
-# Extract the month name
-df['Month'] = df['Date of activity:'].dt.month_name()
 
 # Filter for October, November, December
 df_q_location = df[df['Month'].isin(['October', 'November', 'December'])]
@@ -1074,26 +1147,20 @@ location_pie = px.pie(
 
 # --------------------- Person Filling Out This Form DF -------------------- #
 
-# Clean and standardize 'Person filling out this form:' values
-df['Person filling out this form:'] = df['Person filling out this form:'].str.strip()
-df['Person filling out this form:'] = df['Person filling out this form:'].replace({
+# Clean and standardize 'Person submitting this form:' values
+df['Person submitting this form:'] = df['Person submitting this form:'].str.strip()
+df['Person submitting this form:'] = df['Person submitting this form:'].replace({
     'Dominique': 'Dominique Street',
     'Jaqueline Ovieod': 'Jaqueline Oviedo',
     'Sonya': 'Sonya Hosey'
 })
 
-# Convert 'Date of activity:' to datetime
-df['Date of activity:'] = pd.to_datetime(df['Date of activity:'])
-
-# Extract the month name
-df['Month'] = df['Date of activity:'].dt.month_name()
-
 # Filter for October, November, December
 df_q_person = df[df['Month'].isin(['October', 'November', 'December'])]
 
-# Group data by Month and Person filling out the form
+# Group data by Month and Person submitting the form
 df_person_counts = (
-    df_q_person.groupby(['Month', 'Person filling out this form:'], sort=False)
+    df_q_person.groupby(['Month', 'Person submitting this form:'], sort=False)
     .size()
     .reset_index(name='Count')
 )
@@ -1102,21 +1169,21 @@ df_person_counts = (
 month_order = ['October', 'November', 'December']
 df_person_counts['Month'] = pd.Categorical(df_person_counts['Month'], categories=month_order, ordered=True)
 
-# Sort the dataframe by 'Month' and 'Person filling out this form:'
-df_person_counts = df_person_counts.sort_values(['Month', 'Person filling out this form:'])
+# Sort the dataframe by 'Month' and 'Person submitting this form:'
+df_person_counts = df_person_counts.sort_values(['Month', 'Person submitting this form:'])
 
 # Create the grouped bar chart
 person_fig = px.bar(
     df_person_counts,
     x='Month',
     y='Count',
-    color='Person filling out this form:',
+    color='Person submitting this form:',
     barmode='group', # Group bars by month
     text='Count',
     labels={ # Specify axis labels
         'Count': 'Number of Forms',
         'Month': 'Month',
-        'Person filling out this form:': 'Person'
+        'Person submitting this form:': 'Person'
     },
 ).update_layout(
     title_x=0.5,
@@ -1129,7 +1196,7 @@ person_fig = px.bar(
         color='black'
     ),
     title=dict(
-        text='Person Filling Forms By Month',  # Title text
+        text='Person Submitting Forms By Month',  # Title text
         font=dict(size=40),  # Font size for the title
         x=0.5  # Center-align the title
     ),
@@ -1165,10 +1232,9 @@ person_fig = px.bar(
     textangle=0, # Ensure text labels are horizontal
     hovertemplate=(  # Custom hover template
         '<br>'
-        '<b>Count: </b>%{y}'
-        # 'Forms Filled: %{y}<br>'  # Count
+        '<b>Count: </b>%{y}' 
     ),
-    customdata=df_person_counts[['Person filling out this form:']].values.tolist(),  # Add custom data for hover
+    customdata=df_person_counts[['Person submitting this form:']].values.tolist(),  # Add custom data for hover
 ).add_vline(
     x=0.5,  # Adjust the position of the line
     line_dash="dash",
@@ -1190,14 +1256,14 @@ person_fig = px.bar(
     layer="below"
 )
 
-df_pf = df['Person filling out this form:'].value_counts().reset_index(name='Count')
+df_pf = df['Person submitting this form:'].value_counts().reset_index(name='Count')
 
-# Bar chart for  Totals:
+# Bar chart for Totals:
 pf_totals_fig = px.bar(
     df_pf,
-    x='Person filling out this form:',
+    x='Person submitting this form:',
     y='Count',
-    color='Person filling out this form:',
+    color='Person submitting this form:',
     text='Count',
 ).update_layout(
     height=850,  # Adjust graph height
@@ -1238,9 +1304,9 @@ pf_totals_fig = px.bar(
 #  Pie chart:
 pf_pie = px.pie(
     df_pf,
-    names='Person filling out this form:',
+    names='Person submitting this form:',
     values='Count',
-    color='Person filling out this form:',
+    color='Person submitting this form:',
     height=800
 ).update_layout(
     title=dict(
@@ -1258,6 +1324,7 @@ pf_pie = px.pie(
     insidetextorientation='horizontal',  # Force text labels to be horizontal
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
+
 
 # -------------------------- Race/ Ethnicity DF ------------------------- #
 
@@ -1758,17 +1825,17 @@ app.layout = html.Div(
             className='divv', 
             children=[ 
             html.H1(
-                'BMHC Client Navigation Report Q1 2025', 
+                f'BMHC Client Navigation Report {current_quarter} 2025', 
                 className='title'),
             html.H1(
-                '10/01/2024 - 12/31/2024', 
+                '01/01/2025 - 3/31/2025', 
                 className='title2'),
             html.Div(
                 className='btn-box', 
                 children=[
                     html.A(
                         'Repo',
-                        href='https://github.com/CxLos/BMHC_Q1_2025_Responses',
+                        href=f'https://github.com/CxLos/BMHC_{current_quarter}_2025_Responses',
                         className='btn'),
                 ]),
     ]),  
@@ -1807,7 +1874,7 @@ html.Div(
             children=[
                 html.Div(
                     className='high1',
-                    children=['Total Clients Served Q1:']
+                    children=[f'{current_quarter} Clients Served']
                 ),
                 html.Div(
                     className='circle1',
@@ -1836,58 +1903,6 @@ html.Div(
     ]
 ),
 
-# html.Div(
-#     className='row1',
-#     children=[
-#         html.Div(
-#             className='graph11',
-#             children=[
-#                 html.Div(
-#                     className='high1',
-#                     children=['Clients Served November:']
-#                 ),
-#                 html.Div(
-#                     className='circle1',
-#                     children=[
-#                         html.Div(
-#                             className='hilite',
-#                             children=[
-#                                 html.H1(
-#                                     className='high2',
-#                                     children=[clients_served_nov]
-#                                 ),
-#                             ]
-#                         ),
-#                     ],
-#                 ),
-#             ],
-#         ),
-#         html.Div(
-#             className='graph22',
-#             children=[
-#                 html.Div(
-#                     className='high1',
-#                     children=['Clients Served December:']
-#                 ),
-#                 html.Div(
-#                     className='circle1',
-#                     children=[
-#                         html.Div(
-#                             className='hilite',
-#                             children=[
-#                                 html.H1(
-#                                     className='high2',
-#                                     children=[clients_served_dec]
-#                                 ),
-#                             ]
-#                         ),
-#                     ],
-#                 ),
-#             ],
-#         ),
-#     ]
-# ),
-
 # ROW 1
 html.Div(
     className='row1',
@@ -1897,7 +1912,7 @@ html.Div(
             children=[
                 html.Div(
                     className='high1',
-                    children=['Total Navigation Hours Q1:']
+                    children=[f'{current_quarter} Navigation Hours']
                 ),
                 html.Div(
                     className='circle2',
@@ -1920,7 +1935,7 @@ html.Div(
             children=[
                 html.Div(
                     className='high1',
-                    children=['Navigation Hours October:']
+                    children=[f'{current_quarter} Travel Time']
                 ),
                 html.Div(
                     className='circle2',
@@ -1930,7 +1945,7 @@ html.Div(
                             children=[
                                 html.H1(
                                     className='high3',
-                                    children=[df_duration_oct]
+                                    # children=[df_travel]
                                 ),
                             ]
                         ),
@@ -1940,58 +1955,7 @@ html.Div(
         ),
     ]
 ),
-# ROW 1
-html.Div(
-    className='row1',
-    children=[
-        html.Div(
-            className='graph11',
-            children=[
-                html.Div(
-                    className='high1',
-                    children=['Navigation Hours November:']
-                ),
-                html.Div(
-                    className='circle2',
-                    children=[
-                        html.Div(
-                            className='hilite',
-                            children=[
-                                html.H1(
-                                    className='high3',
-                                    children=[df_duration_nov]
-                                ),
-                            ]
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        html.Div(
-            className='graph22',
-            children=[
-                html.Div(
-                    className='high1',
-                    children=['Navigation Hours December:']
-                ),
-                html.Div(
-                    className='circle2',
-                    children=[
-                        html.Div(
-                            className='hilite',
-                            children=[
-                                html.H1(
-                                    className='high3',
-                                    children=[df_duration_dec]
-                                ),
-                            ]
-                        ),
-                    ],
-                ),
-            ],
-        ),
-    ]
-),
+
 
 # ROW 5
 html.Div(
