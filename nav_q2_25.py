@@ -1454,7 +1454,7 @@ zip_fig =px.bar(
 
 # ==================================== Folium =================================== #
 
-print("Zip Unique Before:", df['ZIP Code:'].unique().tolist())
+# print("Zip Unique Before:", df['ZIP Code:'].unique().tolist())
 
 df = df[df['ZIP Code:'].str.strip() != ""]
 
@@ -1484,8 +1484,10 @@ df['ZIP2'] = (
 
 print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
 
+df = df[df['ZIP Code:'].str.isdigit()]
+
 # Count of visitors by zip code
-df['ZIP Code:'] = df['ZIP Code:'].where(df['ZIP Code:'].str.isdigit(), mode_value)
+# df['ZIP Code:'] = df['ZIP Code:'].where(df['ZIP Code:'].str.isdigit(), mode_value)
 df['ZIP Code:'] = df['ZIP Code:'].astype(int)
 
 df_zip = df['ZIP Code:'].value_counts().reset_index(name='Residents')
@@ -1495,7 +1497,7 @@ df_zip['Residents'] = df_zip['Residents'].astype(int)
 
 # print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
 
-# print(df_zip.head())
+print(df_zip.head())
 
 # Create a folium map
 m = folium.Map([30.2672, -97.7431], zoom_start=10)
