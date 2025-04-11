@@ -86,7 +86,6 @@ color_sequence = px.colors.qualitative.Plotly
 
 # print(df.head())
 # print('Total entries: ', len(df))
-print('Column Names: \n', df.columns)
 # print('DF Shape:', df.shape)
 # print('Dtypes: \n', df.dtypes)
 # print('Info:', df.info())
@@ -97,6 +96,8 @@ print('Column Names: \n', df.columns)
 # print('Path to data:',file_path)
 
 # ================================= Columns Navigation ================================= #
+
+# print('Column Names: \n', df.columns)
 
 nav_columns = [
     'Timestamp',
@@ -143,12 +144,13 @@ nav_columns = [
 
 df.rename(
     columns={
-        # "Person submitting this form:": "Person",
+        "Person submitting this form:": "Person",
         "Activity Duration (minutes):": "Minutes",
-        # "Total travel time (minutes):": "Travel Time",
-        # "Location Encountered:": "Location",
-        # "Individual's Insurance Status:": "Insurance",
-        # "Type of support given:": "Support",
+        "Total travel time (minutes):": "Travel Time",
+        "Location Encountered:": "Location",
+        "Individual's Insurance Status:": "Insurance",
+        "Type of support given:": "Support",
+        "Race/Ethnicity:" : "Ethnicity",
         # "Individual's Status:": "Status",
     }, 
 inplace=True)
@@ -228,30 +230,25 @@ all_months = [
 start_month_idx = (quarter - 1) * 3
 month_order = all_months[start_month_idx:start_month_idx + 3]
 
+# -------------------------- Activity Duration DF ------------------------- #
+
+df_nav_hours = df[['Month', 'Minutes']]
+nav_hours = df['Minutes'].sum()/60
+nav_hours = round(nav_hours)  # Round to the nearest whole number
+# print('Activity Duration:', df_duration/60, 'hours')
+
 # -------------------------- Clients Served DF ------------------------- #
 
 clients_served = len(df)
-# print('Clients Served This Month:', patients_served)
+# print('Clients Served This Month:', clients_served)
 
 df['Clients Served'] = len(df)
-
-# Clients served in October:
-clients_oct = df[df['Month'] == 'October']
-clients_served_oct = len(clients_oct)
-
-# Clients served in November:
-clients_nov = df[df['Month'] == 'November']
-clients_served_nov = len(clients_nov)
-
-# Clients Served in December:
-clients_dec = df[df['Month'] == 'December']
-clients_served_dec = len(clients_dec)
 
 clients = []
 for month in months_in_quarter:
     clients_in_month = df[df['Month'] == month].shape[0]  # Count the number of rows for each month
     clients.append(clients_in_month)
-    print(f'Clients Served in {month}:', clients_in_month)
+    # print(f'Clients Served in {month}:', clients_in_month)
 
 # Create a DataFrame with the results for plotting
 df_clients = pd.DataFrame(
@@ -261,9 +258,9 @@ df_clients = pd.DataFrame(
     }
 )
 
-# print(df_clients_q1)
+# print(df_clients)
 
-clients_served_fig = px.bar(
+client_fig = px.bar(
     df_clients, 
     x='Month', 
     y='Clients Served',
@@ -299,6 +296,15 @@ clients_served_fig = px.bar(
         tickvals=df_clients['Month'].unique(),
         tickangle=0  # Rotate x-axis labels for better readability
     ),
+    legend=dict(
+        # title='Administrative Activity',
+        title=None,
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
 ).update_traces(
     texttemplate='%{text}',  # Display the count value above bars
     textfont=dict(size=20),  # Increase text size in each bar
@@ -309,7 +315,7 @@ clients_served_fig = px.bar(
     ),
 )
 
-clients_pie = px.pie(
+client_pie = px.pie(
     df_clients,
     names='Month',
     values='Clients Served',
@@ -339,11 +345,156 @@ clients_pie = px.pie(
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
-# -------------------------- Activity Duration DF ------------------------- #
+# -------------------------- Travel Time ------------------------- #
 
-df_duration = df['Minutes'].sum()/60
-df_duration = round(df_duration)  # Round to the nearest whole number
-# print('Activity Duration:', df_duration/60, 'hours')
+# print("Travel Time Unique Before: \n", df['Travel Time'].unique().tolist())
+
+travel_unique =  [
+0, 60, 30, 'The Bumgalows', 45, '', 15, 240
+ ]
+
+# Clean travel time values
+df['Travel Time'] = (
+    df['Travel Time']
+    .astype(str)
+    .str.strip()
+    .replace({
+        "" : pd.NA,
+        "The Bumgalows" : 0,
+    })
+)
+
+df['Travel Time'] = pd.to_numeric(df['Travel Time'], errors='coerce')
+df['Travel Time'] = df['Travel Time'].fillna(0)
+
+# print("Travel Time Unique After: \n", df['Total travel time (minutes):'].unique().tolist())
+# print(['Travel Time Value Counts: \n', df['Travel Time'].value_counts()])
+
+total_travel_time = df['Travel Time'].sum()/60
+total_travel_time = round(total_travel_time)
+# print("Total travel time:",total_travel_time)
+
+# Calculate total travel time per month
+travel_hours = []
+for month in months_in_quarter:
+    hours_in_month = df[df['Month'] == month]['Travel Time'].sum() / 60
+    hours_in_month = round(hours_in_month)
+    travel_hours.append(hours_in_month)
+    # print(f'Travel Time in {month}:', hours_in_month)
+
+df_travel = pd.DataFrame({
+    'Month': months_in_quarter,
+    'Travel Time': travel_hours
+})
+
+# Bar chart
+travel_fig = px.bar(
+    df_travel,
+    x='Month',
+    y='Travel Time',
+    color='Month',
+    text='Travel Time',
+    labels={
+        'Travel Time': 'Travel Time (hours)',
+        'Month': 'Month'
+    }
+).update_layout(
+    title_x=0.5,
+    xaxis_title='Month',
+    yaxis_title='Travel Time (hours)',
+    height=600,
+    title=dict(
+        text=f'{current_quarter} Travel Time by Month',
+        x=0.5, 
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black',
+            )
+    ),
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    xaxis=dict(
+        title=dict(
+            text=None,
+            font=dict(size=20),
+        ),
+        tickmode='array',
+        tickvals=df_travel['Month'].unique(),
+        tickangle=0
+    ),
+).update_traces(
+    texttemplate='%{text}',
+    textfont=dict(size=20),
+    textposition='auto',
+    textangle=0,
+    hovertemplate='<b>Month</b>: %{label}<br><b>Travel Time</b>: %{y} hours<extra></extra>',
+).add_annotation(
+    x='January',  # Specify the x-axis value
+    y=df_nav_hours.loc[df_nav_hours['Month'] == 'January', 'Minutes'].values[0] - 10,  # Position slightly above the bar
+    text='No data',  # Annotation text
+    showarrow=False,  # Hide the arrow
+    font=dict(size=30, color='red'),  # Customize font size and color
+    align='center',  # Center-align the text
+)
+
+# Pie chart
+travel_pie = px.pie(
+    df_travel,
+    names='Month',
+    values='Travel Time',
+    color='Month',
+    height=550
+).update_layout(
+    title=dict(
+        x=0.5,
+        text=f'{current_quarter} Travel Time Ratio',
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black'
+        ),
+    ),
+    margin=dict(l=0, r=0, t=100, b=0)
+).update_traces(
+    rotation=180,
+    textfont=dict(size=19),
+    textinfo='value+percent',
+    hovertemplate='<b>%{label}</b>: %{value} hours<extra></extra>'
+)
+
+# ----------------------- New/ Returning Stattus DF ------------------------- #
+
+# Group by 'Individual\'s Status:' for all months and calculate percentages
+df_status = df['Individual\'s Status:'].value_counts().reset_index(name='Count')
+df_status['Percentage'] = (df_status['Count'] / df_status['Count'].sum()) * 100
+df_status['Percentage'] = df_status['Percentage'].round(0)  # Round to nearest whole number
+
+# Pie chart
+status_fig = px.pie(
+    df_status,
+    names='Individual\'s Status:',
+    values='Count'
+).update_layout(
+    title= f'{current_quarter} New vs. Returning',
+    title_x=0.5,
+    height=600,
+    showlegend=True,
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    )
+).update_traces(
+    textinfo='percent+value',
+    insidetextorientation='horizontal',  # Force text labels to be horizontal
+    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
+    texttemplate='<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
+    customdata=df_status['Percentage']  # Pass calculated percentage as custom data
+)
 
 # -------------------- Age DF ------------------- #
 
@@ -409,17 +560,17 @@ df_age_counts = (
 month_order = ['January', 'February', 'March']
 
 age_order = [
-    # '10-19', 
+    '10-19', 
     '20-29', 
     '30-39', 
     '40-49',
     '50-59',
     '60-69', 
     '70-79',
-    # '80+'
+    '80+'
     ]
 
-df_age_counts['Month'] = pd.Categorical(df_age_counts['Month'], categories=month_order, ordered=True)
+df_age_counts['Month'] = pd.Categorical(df_age_counts['Month'], categories=months_in_quarter, ordered=True)
 df_age_counts['Age_Group'] = pd.Categorical(df_age_counts['Age_Group'], categories=age_order, ordered=True)
 
 # print(df_decades.value_counts())
@@ -440,7 +591,7 @@ age_fig = px.bar(
 ).update_layout(
     height=850,  # Adjust graph height
     title=dict(
-        text='Month by Month Age Group Comparison',  # Title text
+        text= f'{current_quarter} Age Comparison',  # Title text
         x=0.5,  # Center-align the title
         font=dict(
             size=35,
@@ -463,7 +614,7 @@ age_fig = px.bar(
         ),
     ),
     legend=dict(
-        title='Age Group',
+        title='',
         orientation="v",  # Vertical legend
         x=1.05,  # Position legend to the right
         xanchor="left",  # Anchor legend to the left
@@ -473,10 +624,11 @@ age_fig = px.bar(
     hovermode='x unified', # Display only one hover label per trace
     bargap=0.08,  # Reduce the space between bars
     bargroupgap=0,  # Reduce space between individual bars in groups
+    margin=dict(l=0, r=0, t=60, b=0),
 ).update_traces(
     texttemplate='%{text}',  # Display the count value above bars
     textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
+    textposition='outside',  # Automatically position text above bars
     textangle=0, # Ensure text labels are horizontal
     hovertemplate=(  # Custom hover template
         '<br>'
@@ -495,61 +647,10 @@ age_fig = px.bar(
     line_width=2
 )
 
-# Age Group Totals:
-
 # Group by 'Age_Group' and count the number of patient visits
 df_decades = df.groupby('Age_Group', observed=True).size().reset_index(name='Patient_Visits')
 df_decades['Age_Group'] = pd.Categorical(df_decades['Age_Group'], categories=age_order, ordered=True)
 df_decades = df_decades.sort_values('Age_Group')
-
-# Bar chart for Age Group Totals:
-age_totals_fig = px.bar(
-    df_decades,
-    x='Age_Group',
-    y='Patient_Visits',
-    color='Age_Group',
-    text='Patient_Visits',
-    labels={
-        'Patient_Visits': 'Number of Visits',
-        'Age_Group': 'Age Group'
-    },
-).update_layout(
-    height=850,  # Adjust graph height
-    title=dict(
-        x=0.5,
-        text='Age Group Totals For Q1',  # Title text
-        font=dict(
-            size=35,  # Increase this value to make the title bigger
-            family='Calibri',  # Optional: specify font family
-            color='black'  # Optional: specify font color
-        )
-    ),
-    xaxis=dict(
-        tickfont=dict(size=18),  # Adjust font size for the month labels
-        tickangle=-45,  # Rotate x-axis labels for better readability
-        title=dict(
-            text='Age Group',
-            font=dict(size=20),  # Font size for the title
-        ),
-    ),
-    yaxis=dict(
-        title=dict(
-            text='Number of Visits',
-            font=dict(size=22),  # Font size for the title
-        ),
-    ),
-    bargap=0.08,  # Reduce the space between bars
-    bargroupgap=0,  # Reduce space between individual bars in groups
-).update_traces(
-    texttemplate='%{text}',  # Display the count value above bars
-    textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
-    textangle=0, # Ensure text labels are horizontal
-    hovertemplate=(  # Custom hover template
-        '<b>Age Group</b>: %{y}<br><b>Count</b>: %{x}<extra></extra>'
-    ),
-    customdata=df_decades[['Age_Group']].values.tolist(),  # Add custom data for hover
-)
 
 # Age_Group Pie chart:
 age_pie = px.pie(
@@ -561,13 +662,13 @@ age_pie = px.pie(
 ).update_layout(
     title=dict(
         x=0.5,
-        text='Q1 Age Distribution',  # Title text
+        text= f'{current_quarter} Age Distribution',  # Title text
         font=dict(
             size=35,  # Increase this value to make the title bigger
             family='Calibri',  # Optional: specify font family
             color='black'  # Optional: specify font color
         ),
-    )  # Center-align the title
+    ),  # Center-align the title
 ).update_traces(
     textfont=dict(size=19),  # Increase text size in each bar
     textinfo='value+percent',
@@ -576,41 +677,46 @@ age_pie = px.pie(
 
 # ------------------------ Type of Support Given DF --------------------------- #
 
-# DataFrame for columns "Type of support given:" and "Date of activity:"
-df_support = df[['Type of support given:', 'Date of Activity']]
+# print("Support Unique Before: \n", df['Support'].unique().tolist())
 
-# # Extract the month from the 'Date of activity:' column
-df_support['Month'] = df_support['Date of Activity'].dt.month_name()
+support_unique = [
+    
+]
 
-# # Filter data for October, November, and December
-df_support_q = df_support[df_support['Month'].isin(['October', 'November', 'December'])]
+df['Support'] = (
+    df['Support']
+    .astype(str)
+    .str.strip()
+    .replace({
+        "" : pd.NA,
+    })
+    )
 
 # Group the data by 'Month' and 'Type of support given:' to count occurrences
 df_support_counts = (
-    df_support_q.groupby(['Month', 'Type of support given:'],sort=False)
+    df.groupby(['Month', 'Support'],sort=False)
     .size()
     .reset_index(name='Count')
 )
 
-# Sort months in the desired order
-month_order = ['October', 'November', 'December']
+# print("Support Unique After: \n", df['Support'].unique().tolist())
 
 df_support_counts['Month'] = pd.Categorical(
     df_support_counts['Month'], 
-    categories = month_order, 
-    ordered=True) # pd.Categorical is to specify the order of the categories for sorting purposes and to avoid alphabetical sorting
+    categories = months_in_quarter, 
+    ordered=True)
 
-# print(df_service_counts)
+# print(df_support_counts)
 
 # Support_fig grouped bar chart
 support_fig = px.bar(
     df_support_counts,
     x='Month',
     y='Count',
-    color='Type of support given:',
+    color='Support',
     barmode='group',
     text='Count',
-    title='Type of Support Given',
+    title='Support',
     labels={ 
         'Count': 'Number of Services',
         'Month': 'Month',
@@ -621,6 +727,15 @@ support_fig = px.bar(
     xaxis_title='Month',
     yaxis_title='Count',
     height=900,  # Adjust graph height
+        title=dict(
+        text= f'{current_quarter} Type of Support',  # Title text
+        x=0.5,  # Center-align the title
+        font=dict(
+            size=35,
+            family='Calibri',  # Optional: specify font family),  # Font size for the title
+            color='black',  # Optional: specify font color
+        )
+    ),
     font=dict(
         family='Calibri',
         size=17,
@@ -628,11 +743,11 @@ support_fig = px.bar(
     ),
     xaxis=dict(
         tickmode='array',
-        tickvals=df_support_counts['Month'].unique(),
+        # tickvals=df_support_counts['Month'].unique(),
         tickangle=-35  # Rotate x-axis labels for better readability
     ),
     legend=dict(
-        title='Type of Support',
+        title='',
         orientation="v",  # Vertical legend
         x=1.05,  # Position legend to the right
         xanchor="left",  # Anchor legend to the left
@@ -643,14 +758,14 @@ support_fig = px.bar(
     bargap=0.08,  # Reduce the space between bars
     bargroupgap=0,  # Reduce space between individual bars in groups
 ).update_traces(
-    textposition='auto', 
+    textposition='outside', 
     textangle=0, # Automatically position text above bars
     textfont=dict(size=30),  # Increase text size in each bar
     hovertemplate=(  # Custom hover template
         '<br>'
         '<b>Count: </b>%{y}'
     ),
-    customdata=df_support_counts[["Type of support given:"]].values.tolist(),  # Add custom data for hover
+    customdata=df_support_counts[["Support"]].values.tolist(),  # Add custom data for hover
 ).add_vline(
     x=0.5,  # Adjust the position of the line
     line_dash="dash",
@@ -672,70 +787,28 @@ support_fig = px.bar(
     layer="below"
 )
 
-df_support = df['Type of support given:'].value_counts().reset_index(name='Count')
-
-# Type of support given Bar Chart Totals:
-support_totals_fig = px.bar(
-    df_support,
-    x='Type of support given:',
-    y='Count',
-    color='Type of support given:',
-    text='Count',
-).update_layout(
-    height=850,  # Adjust graph height
-    title=dict(
-        x=0.5,
-        text='Type of Support Given Q1 Totals',  # Title text
-        font=dict(
-            size=35,  # Increase this value to make the title bigger
-            family='Calibri',  # Optional: specify font family
-            color='black'  # Optional: specify font color
-        )
-    ),
-    xaxis=dict(
-        tickfont=dict(size=18),  # Adjust font size for the month labels
-        tickangle=-25,  # Rotate x-axis labels for better readability
-        title=dict(
-            text='',
-            font=dict(size=20),  # Font size for the title
-        ),
-    ),
-    yaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=22),  # Font size for the title
-        ),
-    ),
-    bargap=0.08,  # Reduce the space between bars
-    bargroupgap=0,  # Reduce space between individual bars in groups
-).update_traces(
-    texttemplate='%{text}',  # Display the count value above bars
-    textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
-    textangle=0, # Ensure text labels are horizontal
-    hovertemplate=(  # Custom hover template
-        '<b>Support</b>: %{label}<br><b>Count</b>: %{y}<extra></extra>'    
-        ),
-)
+df_support = df['Support'].value_counts().reset_index(name='Count')
 
 #  Pie chart:
 support_pie = px.pie(
     df_support,
-    names='Type of support given:',
+    names='Support',
     values='Count',
-    color='Type of support given:',
+    color='Support',
     height=800
 ).update_layout(
     title=dict(
         x=0.5,
-        text='Q1 Type of Support Given',  # Title text
+        text= f'{current_quarter} Type of Support Given',  # Title text
         font=dict(
             size=35,  # Increase this value to make the title bigger
             family='Calibri',  # Optional: specify font family
             color='black'  # Optional: specify font color
         ),
-    )  # Center-align the title
+    ),
+    margin=dict(l=0, r=0, t=50, b=0)
 ).update_traces(
+    rotation = 90,
     textfont=dict(size=19),  # Increase text size in each bar
     textinfo='value+percent',
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
@@ -759,26 +832,23 @@ custom_colors = {
     'December': 'YlGnBu',
 }
 
-# Ensure the 'Date of activity:' column is in datetime format
-# df['Date of activity:'] = pd.to_datetime(df['Date of activity:'], errors='coerce')
-
-# Clean and preprocess the 'Individual's Insurance Status:' column
-df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].str.strip()
-df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].replace('MAP 000', 'MAP 100')
-df["Individual's Insurance Status:"] = df["Individual's Insurance Status:"].replace('Did not disclose.', 'NONE')
-
-# Filter data for October, November, and December
-df_q_insurance = df[df['Month'].isin(['October', 'November', 'December'])]
+df['Insurance'] = (df['Insurance']
+      .astype(str)
+        .str.strip()
+        .replace({
+            'MAP 000' : "MAP 100",
+            'Did not disclose.' : "NONE",
+        })
+      )
 
 # Group data by Month and Insurance Status
 df_insurance_counts = (
-    df_q_insurance.groupby(['Month', "Individual's Insurance Status:"], sort=False)
+    df.groupby(['Month', 'Insurance'], sort=False)
     .size() # Count the number of occurrences
     .reset_index(name='Count') # Reset the index and rename the count column
 )
 
 # Sort months in the desired order
-# month_order = ['October', 'November', 'December']
 df_insurance_counts['Month'] = pd.Categorical(
     df_insurance_counts['Month'], 
     categories=months_in_quarter, 
@@ -788,17 +858,18 @@ df_insurance_counts['Month'] = pd.Categorical(
 # Add a custom color column based on the month
 df_insurance_counts['Color'] = df_insurance_counts['Month'].map(custom_colors)
 
+df_insurance_counts['Color'] = df_insurance_counts['Month'].map(custom_colors)
+
 # Create the grouped bar chart
 insurance_fig = px.bar(
     df_insurance_counts,
     x='Month',
     y='Count',
-    color="Individual's Insurance Status:",
+    color="Insurance",
     barmode='group',
     text='Count',
-    title='Insurance Status Monthly Comparison',
     labels={
-        "Individual's Insurance Status:": "Insurance Status",
+        "Insurance": "Insurance Status",
         'Count': 'Number of Individuals',
         'Month': 'Month'
     },
@@ -807,6 +878,15 @@ insurance_fig = px.bar(
     xaxis_title='Month',
     yaxis_title='Count',
     height=900,  # Adjust graph height
+    title=dict(
+        text= f'{current_quarter } Insurance Status by Month',
+        x=0.5, 
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black',
+            )
+    ),
     font=dict(
         family='Calibri',
         size=17,
@@ -816,7 +896,7 @@ insurance_fig = px.bar(
         tickangle=-15  # Rotate x-axis labels for better readability
     ),
     legend=dict(
-        title='Insurance Status',
+        title='',
         orientation="v",  # Vertical legend
         x=1.05,  # Position legend to the right
         xanchor="left",  # Anchor legend to the left
@@ -826,15 +906,16 @@ insurance_fig = px.bar(
     hovermode='x unified', # Display only one hover label per trace
     bargap=0.08,  # Reduce the space between bars
     bargroupgap=0,  # Reduce space between individual bars in groups
+    margin=dict(l=0, r=0, t=50, b=0),
 ).update_traces(
     texttemplate='%{text}',  # Display the count value above bars
     textfont=dict(size=30),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
+    textposition='outside',  # Automatically position text above bars
     hovertemplate=(  # Custom hover template
             '<br>'
         '<b>Count:</b> %{y}<br>'  # Count
     ),
-    customdata=df_insurance_counts[["Individual's Insurance Status:"]].values.tolist(),  # Add custom data for hover
+    customdata=df_insurance_counts[["Insurance"]].values.tolist(),  # Add custom data for hover
 ).add_vline(
     x=0.5,  # Adjust the position of the line
     line_dash="dash",
@@ -847,189 +928,153 @@ insurance_fig = px.bar(
     line_width=2
 )
 
-df_insurance = df.groupby("Individual's Insurance Status:").size().reset_index(name='Count')
+df_insurance = df[['Month', "Insurance"]]
+df_insurance = df_insurance.groupby('Insurance').size().reset_index(name='Count')
 
-# Bar chart for Insurance Totals:
-insurance_totals_fig = px.bar(
+# Insurance Status Pie Chart:
+insurance_pie = px.pie(
     df_insurance,
-    x='Individual\'s Insurance Status:',
-    y='Count',
-    color='Individual\'s Insurance Status:',
-    text='Count',
+    names="Insurance",
+    values='Count',
+    color="Insurance",
+    height=900
 ).update_layout(
-    height=850,  # Adjust graph height
     title=dict(
         x=0.5,
-        text='Insurance Status Q1 Totals',  # Title text
+        text= f'{current_quarter} Insurance Distribution',  # Title text
         font=dict(
             size=35,  # Increase this value to make the title bigger
             family='Calibri',  # Optional: specify font family
             color='black'  # Optional: specify font color
-        )
-    ),
-    xaxis=dict(
-        tickfont=dict(size=18),  # Adjust font size for the month labels
-        tickangle=-25,  # Rotate x-axis labels for better readability
-        title=dict(
-            text=None,
-            font=dict(size=20),  # Font size for the title
         ),
-    ),
-    yaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=22),  # Font size for the title
-        ),
-    ),
-    bargap=0.08,  # Reduce the space between bars
+    ),  
+    margin=dict(l=0, r=0, t=50, b=0)
 ).update_traces(
-    texttemplate='%{text}',  # Display the count value above bars
-    textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
-    textangle=0, # Ensure text labels are horizontal
-    hovertemplate=(  # Custom hover template
-        '<b>Insurance</b>: %{label}<br><b>Count</b>: %{y}<extra></extra>'  
-    ),
-)
-
-# Heatmap for Insurance Status:
-df_insurance_pivot = df_insurance_counts.pivot(
-    index='Month',
-    columns="Individual's Insurance Status:",
-    values='Count'
-)
-
-# Create the heatmap
-insurance_heatmap = go.Figure(
-    data=go.Heatmap(
-        z=df_insurance_pivot.values,
-        x=df_insurance_pivot.columns,
-        y=df_insurance_pivot.index,
-        colorscale='viridis'
-    )
-
-).update_layout(
-    title='Insurance Status Heatmap',
-    title_x=0.5,
-    xaxis_title="Insurance Status",
-    yaxis_title="Month",
-    font=dict(
-        family='Calibri',
-        size=17,
-    )
-)
-
-# Treemap for Insurance Status:
-insurance_treemap = px.treemap(
-    df_insurance_counts,
-    path=['Month', "Individual's Insurance Status:"],
-    values='Count',
-    color='Color',
-    # color_continuous_scale='Blues',  # Adjust the colorscale as needed
-    title='Insurance Status Treemap',
-    height=1000
-).update_layout(
-    title_x=0.5,
-    font=dict(
-        family='Calibri',
-        size=17,
-    )
-).update_traces(
-    textinfo='label+value',  # Show label, count, and percent of parent
-    hovertemplate='<b>%{label}</b>: %{percent}<extra></extra>'
-)
-
-# Insurance Status Pie Chart:
-insurance_pie = px.pie(
-    df_insurance_counts,
-    names="Individual's Insurance Status:",
-    values='Count',
-    color="Individual's Insurance Status:",
-    title='Q1 Insurance Status',
-    height=900
-).update_layout(
-    title_x=0.5,
-    font=dict(
-        family='Calibri',
-        size=17,
-    )
-).update_traces(
+    rotation=180,  
     textfont=dict(size=19), 
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
+    insidetextorientation='horizontal', 
     textinfo='percent+value',
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
 # ------------------------ Location Encountered DF ----------------------- #
 
-# Clean and standardize 'Location Encountered:' values
-df['Location Encountered:'] = df['Location Encountered:'].str.strip()
-df['Location Encountered:'] = df['Location Encountered:'].replace({
-    'Southbridge': 'SouthBridge',
-    'The Bumgalows': 'The Bungalows',
-    'DACC': 'Downtown Austin Community Court',
-    'SNHC': 'Sunrise Navigation Homeless Center',
-    'HATC': 'Housing Authority of Travis County',
-    'CFV': 'Community First Village',
-    'BMHC': 'Black Men\'s Health Clinic'
-})
+# print("Location Unique Before:", df['Location'].unique().tolist())
 
-# Filter for October, November, December
-df_q_location = df[df['Month'].isin(['October', 'November', 'December'])]
+location_unique = [
+    "Black Men's Health Clinic", 'Downtown Austin Community Court', 'Cross Creek Hospital', 'South Bridge', 'The Bumgalows', 'Office (remote) ', 'The Bungalows', 'Extended Stay America (Host Hotel) ', 'last known area was St. John. Connected with Hungry Hill to help me search for client ', 'PHONE CONTACT', 'PHONE', 'BMHC', 'GudLife', 'phone ', 'Home of resident', 'Community First Village', 'Cross Creek hospital', 'over phone', 'phone', 'phone call', 'over the phone', 'Hungry Hill/Austin Urban League', 'Cross creek hospital', 'Vivent Health', 'Clients home', 'Extended Stay America ', 'Outreach in the field ', 'Integral Care St. John Office ', 'Extended Stay America Hotel ', 'Outreach ', 'picked client up from encampment for SSA appointment'
+]
+
+df['Location'] = (
+    df['Location']
+    .astype(str)
+    .str.strip()
+    .replace({
+        '' : pd.NA,
+        'BMHC': "Black Men's Health Clinic",
+        "Black Men's Health Clinic": "Black Men's Health Clinic",
+        
+        'Downtown Austin Community Court': 'Downtown Austin Community Court',
+        
+        'Cross Creek Hospital': 'Cross Creek Hospital',
+        'Cross creek hospital': 'Cross Creek Hospital',
+        'Cross Creek hospital': 'Cross Creek Hospital',
+        
+        'South Bridge': 'SouthBridge',
+        'Southbridge': 'SouthBridge',
+        
+        'The Bumgalows': 'The Bungalows',
+        'The Bungalows': 'The Bungalows',
+        
+        'Office (remote)': 'Remote Office',
+        
+        'Extended Stay America (Host Hotel)': 'Extended Stay America',
+        'Extended Stay America Hotel': 'Extended Stay America',
+        'Extended Stay America': 'Extended Stay America',
+        
+        'last known area was St. John. Connected with Hungry Hill to help me search for client': 'Field Outreach - St. John Area',
+        'picked client up from encampment for SSA appointment': 'Field Outreach - SSA Pickup',
+        'Outreach in the field': 'Field Outreach',
+        'Outreach': 'Field Outreach',
+        
+        'PHONE CONTACT': 'Phone',
+        'PHONE': 'Phone',
+        'phone': 'Phone',
+        'phone ': 'Phone',
+        'phone call': 'Phone',
+        'over phone': 'Phone',
+        'over the phone': 'Phone',
+        
+        'Home of resident': 'Client Home',
+        'Clients home': 'Client Home',
+        
+        'GudLife': 'GudLife',
+        'Vivent Health': 'Vivent Health',
+        
+        'Community First Village': 'Community First Village',
+        'CFV': 'Community First Village',
+        
+        'Hungry Hill/Austin Urban League': 'Hungry Hill / Austin Urban League',
+        
+        'Integral Care St. John Office': 'Integral Care - St. John',
+    })
+)
+
+
+# print("Location Unique After:", df['Location'].unique().tolist())
 
 # Group data by Month and Location Encountered
 df_location_counts = (
-    df_q_location.groupby(['Month', 'Location Encountered:'], 
+    df.groupby(['Month', 'Location'], 
     sort=False) # Do not sort the groups
     .size() # Count the number of occurrences
     .reset_index(name='Count') # Reset the index and rename the count column
 )
 
-# Sort months and locations
-month_order = ['October', 'November', 'December'] # Define the order of months
+# print("Location Unique After:", df['Location'].unique().tolist())
 
-df_location_counts['Month'] = pd.Categorical(df_location_counts['Month'], # Categorize the months for sorting purposes and to avoid alphabetical sorting.
-    categories=month_order, # Specify the order of the categories
+df_location_counts['Month'] = pd.Categorical(
+    df_location_counts['Month'], # Categorize the months for sorting purposes and to avoid alphabetical sorting.
+    categories=months_in_quarter, # Specify the order of the categories
     ordered=True) # Ensure the categories are ordered
 
-df_location_counts = df_location_counts.sort_values(['Month', 'Location Encountered:'])
-
+df_location_counts = df_location_counts.sort_values(['Month', 'Location'])
 
 # Create the grouped bar chart
 location_fig = px.bar(
     df_location_counts,
     x='Month',
     y='Count',
-    color='Location Encountered:',
+    color='Location',
     barmode='group',
     text='Count',
     labels={
         'Count': 'Number of Encounters',
         'Month': 'Month', # Specify the axis labels
-        'Location Encountered:': 'Location' # Specify the axis labels
+        'Location': 'Location' # Specify the axis labels
     },
 ).update_layout(
     title_x=0.5,
     yaxis_title='Number of Encounters',
     height=900,  # Adjust graph height
+    title=dict(
+        text=f'{current_quarter} Location Encountered by Month',
+        x=0.5, 
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black',
+            )
+    ),
     font=dict(
         family='Calibri',
         size=17,
         color='black'
     ),
-    title=dict(
-        text='Locations Encountered by Month',  # Title text
-        font=dict(size=40),  # Font size for the title
-        x=0.5  # Center-align the title
-    ),
     xaxis=dict(
         title=None,
         tickangle=-15,  # Rotate x-axis labels for better readability
         tickfont=dict(size=25),  # Adjust font size for the month labels
-        # title=dict(
-        #     # text='Month',
-        #     font=dict(size=25),  # Font size for the title
-        # ),
     ),
     yaxis=dict(
         title=dict(
@@ -1037,22 +1082,23 @@ location_fig = px.bar(
             font=dict(size=25),  # Font size for the title
         ),
     ),
-legend=dict(
-    title=dict(
-        text='Location',  # Legend title text
-        font=dict(size=20),  # Font size for the legend title
-        side='top',  # Position the title at the top of the legend box
-    ),
-    orientation="v",  # Vertical legend
-    x=1.05,  # Position legend to the right
-    xanchor="left",  # Anchor legend to the left
-    y=1,  # Position legend at the top
-    yanchor="top",  # Anchor legend at the top
-    valign='middle',  # Vertically align legend content to the middle
+    legend=dict(
+        title=dict(
+            text='Location',  # Legend title text
+            font=dict(size=20),  # Font size for the legend title
+            side='top',  # Position the title at the top of the legend box
+        ),
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top",  # Anchor legend at the top
+        valign='middle',  # Vertically align legend content to the middle
 ),
     hovermode='x unified', # Display only one hover label per trace
     bargap=0.08,  # Reduce the space between bars
     bargroupgap=0,  # Reduce space between individual bars in groups
+    margin=dict(l=0, r=0, t=50, b=0)
 ).update_traces(
     texttemplate='%{text}',  # Display the count value above bars
     textfont=dict(size=30),  # Increase text size in each bar
@@ -1062,7 +1108,7 @@ legend=dict(
         '<br>'
         '<b>Count: </b>%{y}<br>'  # Count
     ),
-    customdata=df_location_counts[['Location Encountered:']].values.tolist(),  # Add custom data for hover
+    customdata=df_location_counts[['Location']].values.tolist(),  # Add custom data for hover
 ).add_vline(
     x=0.5,  # Adjust the position of the line
     line_dash="dash",
@@ -1075,143 +1121,128 @@ legend=dict(
     line_width=2
 )
 
-df_location = df['Location Encountered:'].value_counts().reset_index(name='Count')
-
-# Bar chart for  Totals:
-location_totals_fig = px.bar(
-    df_location,
-    x='Location Encountered:',
-    y='Count',
-    color='Location Encountered:',
-    text='Count',
-).update_layout(
-    height=850,  # Adjust graph height
-    title=dict(
-        x=0.5,
-        text='Locations Encountered Q1 Totals',  # Title text
-        font=dict(
-            size=35,  # Increase this value to make the title bigger
-            family='Calibri',  # Optional: specify font family
-            color='black'  # Optional: specify font color
-        )
-    ),
-    xaxis=dict(
-        tickfont=dict(size=18),  # Adjust font size for the month labels
-        tickangle=-25,  # Rotate x-axis labels for better readability
-        title=dict(
-            text=None,
-            font=dict(size=20),  # Font size for the title
-        ),
-    ),
-    yaxis=dict(
-        title=dict(
-            text='Count',
-            font=dict(size=22),  # Font size for the title
-        ),
-    ),
-    bargap=0.08,  # Reduce the space between bars
-).update_traces(
-    texttemplate='%{text}',  # Display the count value above bars
-    textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
-    textangle=0, # Ensure text labels are horizontal
-    hovertemplate=(  # Custom hover template
-        '<b>Location</b>: %{label}<br><b>Count</b>: %{y}<extra></extra>'  
-    ),
-)
+df_location = df['Location'].value_counts().reset_index(name='Count')
 
 #  Pie chart:
 location_pie = px.pie(
     df_location,
-    names='Location Encountered:',
+    names='Location',
     values='Count',
-    color='Location Encountered:',
+    color='Location',
     height=800
 ).update_layout(
     title=dict(
         x=0.5,
-        text='Q1 Encounters',  # Title text
+        text= f'{current_quarter} Ratio of Location Encounters',  # Title text
         font=dict(
             size=35,  # Increase this value to make the title bigger
             family='Calibri',  # Optional: specify font family
             color='black'  # Optional: specify font color
         ),
-    )  # Center-align the title
+    ),
+    margin=dict(l=0, r=0, t=50, b=0)
 ).update_traces(
-    rotation=-90,
+    rotation=0,
     textfont=dict(size=19),  # Increase text size in each bar
-    textinfo='value+percent',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
+    textinfo='percent',
+    # textinfo=None,
+    # texttemplate='%{value}<br>%{percent:.1%}', 
+    # insidetextorientation='horizontal',  # Force text labels to be horizontal
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
 # --------------------- Person Filling Out This Form DF -------------------- #
 
-# Clean and standardize 'Person submitting this form:' values
-df['Person submitting this form:'] = df['Person submitting this form:'].str.strip()
-df['Person submitting this form:'] = df['Person submitting this form:'].replace({
-    'Dominique': 'Dominique Street',
-    'Jaqueline Ovieod': 'Jaqueline Oviedo',
-    'Sonya': 'Sonya Hosey'
-})
+person_unique = [
+    'Viviana Varela', 
+    'Jaqueline Oviedo',
+    'Michael Lambert', 
+    'Michael Lambert ', 
+    'Larry Wallace Jr',
+    'Rishit Yokananth', 
+    'Dominique Street', 
+    'Dr Larry Wallace Jr',
+    'Eric Roberts', 
+    'The Bumgalows', 
+    'Kimberly Holiday', 
+    'Toya Craney',
+    'Sonya Hosey',
+    'Eric roberts', 
+    'EricRoberts'
+]
 
-# Filter for October, November, December
-df_q_person = df[df['Month'].isin(['October', 'November', 'December'])]
+# print("Person Unique Before:", df["Person"].unique().tolist())
+
+df['Person'] = (
+    df['Person']
+        .astype(str)
+        .str.strip()
+        .replace({
+            '' : pd.NA,
+            'Dominique': 'Dominique Street',
+            'Jaqueline Ovieod': 'Jaqueline Oviedo',
+            'Sonya': 'Sonya Hosey',
+            'EricRoberts': 'Eric Roberts',
+            'Eric roberts': 'Eric Roberts',
+            'Larry Wallace Jr': 'Dr Larry Wallace Jr',
+        })
+)
 
 # Group data by Month and Person submitting the form
 df_person_counts = (
-    df_q_person.groupby(['Month', 'Person submitting this form:'], sort=False)
+    df.groupby(['Month', 'Person'], sort=False)
     .size()
     .reset_index(name='Count')
 )
 
-# Sort months and person names
-month_order = ['October', 'November', 'December']
-df_person_counts['Month'] = pd.Categorical(df_person_counts['Month'], categories=month_order, ordered=True)
+df_person_counts['Month'] = pd.Categorical(
+    df_person_counts['Month'], 
+    categories=months_in_quarter, 
+    ordered=True)
 
 # Sort the dataframe by 'Month' and 'Person submitting this form:'
-df_person_counts = df_person_counts.sort_values(['Month', 'Person submitting this form:'])
+df_person_counts = df_person_counts.sort_values(['Month', 'Person'])
 
 # Create the grouped bar chart
 person_fig = px.bar(
     df_person_counts,
     x='Month',
     y='Count',
-    color='Person submitting this form:',
-    barmode='group', # Group bars by month
+    color='Person',
+    barmode='group', 
     text='Count',
-    labels={ # Specify axis labels
+    labels={
         'Count': 'Number of Forms',
         'Month': 'Month',
-        'Person submitting this form:': 'Person'
+        'Person': 'Person'
     },
 ).update_layout(
     title_x=0.5,
     xaxis_title='Month',
     yaxis_title='Number of Forms',
-    height=900,  # Adjust graph height
+    height=900,  
     font=dict(
         family='Calibri',
         size=17,
         color='black'
     ),
     title=dict(
-        text='Person Submitting Forms By Month',  # Title text
-        font=dict(size=40),  # Font size for the title
-        x=0.5  # Center-align the title
+        text= f'{current_quarter} Person Submitting Forms By Month',  
+        font=dict(size=40),  
+        x=0.5  
     ),
     xaxis=dict(
         title=dict(
-            text=None,  # The title of the x-axis
-            standoff=200  # Add padding between the axis title and the chart
+            text=None, 
+            standoff=200
         ),
-        automargin=True,  # Ensure margins adjust automatically
-        tickfont=dict(size=25)  # Font size for tick labels
+        automargin=True,
+        tickfont=dict(size=25)
     ),
     yaxis=dict(
         title=dict(
             text='Number of Submissions',
-            font=dict(size=25),  # Font size for the title
+            font=dict(size=25),
         ),
     ),
     legend=dict(
@@ -1225,6 +1256,7 @@ person_fig = px.bar(
     bargap=0.08,  # Reduce the space between bars
     bargroupgap=0,  # Reduce space between individual bars in groups
     hovermode='x unified', # Display only one hover label per trace
+    margin=dict(l=0, r=0, t=50, b=0)
 ).update_traces(
     texttemplate='%{text}',  # Display the count value above bars
     textfont=dict(size=30),  # Increase text size in each bar
@@ -1234,7 +1266,7 @@ person_fig = px.bar(
         '<br>'
         '<b>Count: </b>%{y}' 
     ),
-    customdata=df_person_counts[['Person submitting this form:']].values.tolist(),  # Add custom data for hover
+    customdata=df_person_counts[['Person']].values.tolist(),  # Add custom data for hover
 ).add_vline(
     x=0.5,  # Adjust the position of the line
     line_dash="dash",
@@ -1256,332 +1288,125 @@ person_fig = px.bar(
     layer="below"
 )
 
-df_pf = df['Person submitting this form:'].value_counts().reset_index(name='Count')
-
-# Bar chart for Totals:
-pf_totals_fig = px.bar(
-    df_pf,
-    x='Person submitting this form:',
-    y='Count',
-    color='Person submitting this form:',
-    text='Count',
-).update_layout(
-    height=850,  # Adjust graph height
-    title=dict(
-        x=0.5,
-        text='Total Q1 Form Submission by Person',  # Title text
-        font=dict(
-            size=35,  # Increase this value to make the title bigger
-            family='Calibri',  # Optional: specify font family
-            color='black'  # Optional: specify font color
-        )
-    ),
-    xaxis=dict(
-        tickfont=dict(size=18),  # Adjust font size for the month labels
-        tickangle=-25,  # Rotate x-axis labels for better readability
-        title=dict(
-            text=None,
-            font=dict(size=20),  # Font size for the title
-        ),
-    ),
-    yaxis=dict(
-        title=dict(
-            text='Number of Submissions',
-            font=dict(size=22),  # Font size for the title
-        ),
-    ),
-    bargap=0.08,  # Reduce the space between bars
-).update_traces(
-    texttemplate='%{text}',  # Display the count value above bars
-    textfont=dict(size=20),  # Increase text size in each bar
-    textposition='auto',  # Automatically position text above bars
-    textangle=0, # Ensure text labels are horizontal
-    hovertemplate=(  # Custom hover template
-        '<b>Name</b>: %{label}<br><b>Count</b>: %{y}<extra></extra>'  
-    ),
-)
+df_pf = df['Person'].value_counts().reset_index(name='Count')
 
 #  Pie chart:
 pf_pie = px.pie(
     df_pf,
-    names='Person submitting this form:',
+    names='Person',
     values='Count',
-    color='Person submitting this form:',
+    color='Person',
     height=800
 ).update_layout(
     title=dict(
         x=0.5,
-        text='Person Submitting Forms Q1',  # Title text
+        text= f'{current_quarter} Person Submitting Forms',  # Title text
         font=dict(
             size=35,  # Increase this value to make the title bigger
             family='Calibri',  # Optional: specify font family
             color='black'  # Optional: specify font color
         ),
-    )  # Center-align the title
+    ),
+    legend=dict(
+        # title='Administrative Activity',
+        title=None,
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    margin=dict(l=0, r=0, t=50, b=0),
 ).update_traces(
+    rotation=90,
     textfont=dict(size=19),  # Increase text size in each bar
     textinfo='value+percent',
     insidetextorientation='horizontal',  # Force text labels to be horizontal
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
-
 # -------------------------- Race/ Ethnicity DF ------------------------- #
 
-# Groupby Race/Ethnicity:
-df['Race/Ethnicity:'] = df['Race/Ethnicity:'].str.strip()
-df['Race/Ethnicity:'] = df['Race/Ethnicity:'].replace('Hispanic/Latino', 'Hispanic/ Latino')
-df['Race/Ethnicity:'] = df['Race/Ethnicity:'].replace('White', 'White/ European Ancestry')
+df['Ethnicity'] = (
+    df['Ethnicity']
+        .astype(str)
+        .str.strip()
+        .replace({
+            "": pd.NA,
+            'Hispanic/Latino' : 'Hispanic/ Latino',
+            'White' : 'White/ European Ancestry',
+        })
+)
 
-df_race = df['Race/Ethnicity:'].value_counts().reset_index(name='Count')
+df_race = df['Ethnicity'].value_counts().reset_index(name='Count')
 df_race['Percentage'] = (df_race['Count'] / df_race['Count'].sum()) * 100
 df_race['Percentage'] = df_race['Percentage'].round(0)  # Round to nearest whole number
 # print(df_race)
 
-# Group by Race/Ethnicity for October
-df_race_october = df[df['Month'] == 'October']['Race/Ethnicity:'].value_counts().reset_index(name='Count')
-df_race_october.rename(columns={'index': 'Race/Ethnicity'}, inplace=True)
-df_race_october['Percentage'] = (df_race_october['Count'] / df_race_october['Count'].sum()) * 100
-df_race_october['Percentage'] = df_race_october['Percentage'].round(0)  # Round to nearest whole number
-# print(df_race_october)
-# print(df.columns)
-
-# Group by Race/Ethnicity for November
-df_race_november = df[df['Month'] == 'November']['Race/Ethnicity:'].value_counts().reset_index(name='Count')
-df_race_november.rename(columns={'index': 'Race/Ethnicity'}, inplace=True)
-df_race_november['Percentage'] = (df_race_november['Count'] / df_race_november['Count'].sum()) * 100
-df_race_november['Percentage'] = df_race_november['Percentage'].round(0)  # Round to nearest whole number
-# print(df_race_november)
-
-# Group by Race/Ethnicity for December
-df_race_december = df[df['Month'] == 'December']['Race/Ethnicity:'].value_counts().reset_index(name='Count')
-df_race_december.rename(columns={'index': 'Race/Ethnicity'}, inplace=True)
-df_race_december['Percentage'] = (df_race_december['Count'] / df_race_december['Count'].sum()) * 100
-df_race_december['Percentage'] = df_race_december['Percentage'].round(0)  # Round to nearest whole number
-
-# print(df_race_december[['Race/Ethnicity:', 'Count', 'Percentage']])
-
-
 race_fig = px.pie(
     df_race,
-    names='Race/Ethnicity:',
+    names='Ethnicity',
     values='Count'
 ).update_layout(
-    title='Q1 Client Visits by Race',
+    title= f'{current_quarter} Client Visits by Race',
     title_x=0.5,
-    height=700,
+    height=550,
     font=dict(
         family='Calibri',
         size=17,
         color='black'
     ),
-    # hide legend
-    showlegend=True
+    legend=dict(
+        # title='Administrative Activity',
+        title=None,
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    margin=dict(l=0, r=0, t=50, b=0),
 ).update_traces(
-    textinfo='label+percent+value',
+    textinfo='percent+value',
     insidetextorientation='horizontal',  # Force text labels to be horizontal
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
     texttemplate='%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
     customdata=df_race['Percentage']  # Pass calculated percentage as custom data
 )
 
-# Race fig for October
-race_fig_oct = px.pie(
-    df_race_october,
-    names='Race/Ethnicity:',
-    values='Count'
-).update_layout(
-    title='Client Visits by Race October',
-    title_x=0.5,
-    height=700,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    ),
-    # hide legend
-    showlegend=False
-).update_traces(
-    textinfo='label+percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{label}:<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_race_october['Percentage']  # Pass calculated percentage as custom data
-)
-
-# Race fig for October
-race_fig_nov = px.pie(
-    df_race_november,
-    names='Race/Ethnicity:',
-    values='Count'
-).update_layout(
-    title='Client Visits by Race November',
-    title_x=0.5,
-    height=700,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    ),
-    # hide legend
-    showlegend=False
-).update_traces(
-    textinfo='label+percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{label}:<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_race_november['Percentage']  # Pass calculated percentage as custom data
-)
-
-# Race fig for December
-race_fig_dec = px.pie(
-    df_race_december,
-    names='Race/Ethnicity:',
-    values='Count'
-).update_layout(
-    title='Client Visits by Race December',
-    title_x=0.5,
-    height=700,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    ),
-    # hide legend
-    showlegend=False
-).update_traces(
-    textinfo='label+percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{label}:<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_race_december['Percentage']  # Pass calculated percentage as custom data
-)
-
-# ----------------------- New/ Returning Stattus DF ------------------------- #
-
-# Group by 'Individual\'s Status:' for all months and calculate percentages
-df_status = df['Individual\'s Status:'].value_counts().reset_index(name='Count')
-df_status['Percentage'] = (df_status['Count'] / df_status['Count'].sum()) * 100
-df_status['Percentage'] = df_status['Percentage'].round(0)  # Round to nearest whole number
-
-df_status_oct = df[df['Month'] == 'October']['Individual\'s Status:'].value_counts().reset_index(name='Count')
-df_status_oct['Percentage'] = (df_status_oct['Count'] / df_status_oct['Count'].sum()) * 100
-df_status_oct['Percentage'] = df_status_oct['Percentage'].round(0)  # Round to nearest whole number
-
-df_status_nov = df[df['Month'] == 'November']['Individual\'s Status:'].value_counts().reset_index(name='Count')
-df_status_nov['Percentage'] = (df_status_nov['Count'] / df_status_nov['Count'].sum()) * 100
-df_status_nov['Percentage'] = df_status_nov['Percentage'].round(0)  # Round to nearest whole number
-
-df_status_dec = df[df['Month'] == 'December']['Individual\'s Status:'].value_counts().reset_index(name='Count')
-df_status_dec['Percentage'] = (df_status_dec['Count'] / df_status_dec['Count'].sum()) * 100
-df_status_dec['Percentage'] = df_status_dec['Percentage'].round(0)  # Round to nearest whole number
-
-
-# Pie chart for the total 'Individual\'s Status:'
-status_fig = px.pie(
-    df_status,
-    names='Individual\'s Status:',
-    values='Count'
-).update_layout(
-    title='Q1 New vs. Returning',
-    title_x=0.5,
-    height=700,
-    showlegend=True,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    )
-).update_traces(
-    textinfo='percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_status['Percentage']  # Pass calculated percentage as custom data
-)
-
-# Pie chart for October
-status_fig_oct = px.pie(
-    df_status_oct,
-    names='Individual\'s Status:',
-    values='Count'
-).update_layout(
-    title='New vs. Returning October',
-    title_x=0.5,
-    height=700,
-    showlegend=False,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    )
-).update_traces(
-    textinfo='label+percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{label}:<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_status_oct['Percentage']  # Pass calculated percentage as custom data
-)
-
-# Pie chart for November
-status_fig_nov = px.pie(
-    df_status_nov,
-    names='Individual\'s Status:',
-    values='Count'
-).update_layout(
-    title='New vs. Returning November',
-    title_x=0.5,
-    height=700,
-    showlegend=True,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    )
-).update_traces(
-    textinfo='percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_status_nov['Percentage']  # Pass calculated percentage as custom data
-)
-
-# Pie chart for December
-status_fig_dec = px.pie(
-    df_status_dec,
-    names='Individual\'s Status:',
-    values='Count'
-).update_layout(
-    title='New vs. Returning December',
-    title_x=0.5,
-    height=700,
-    showlegend=False,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    )
-).update_traces(
-    textinfo='label+percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{label}:<br>%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_status_dec['Percentage']  # Pass calculated percentage as custom data
-)
-
 # ------------------------ ZIP2 DF ----------------------- #
 
-# make a copy of 'ZIP Code:' column to 'ZIP2':
 df['ZIP2'] = df['ZIP Code:']
-df['ZIP2'] = df['ZIP2'].astype(str).str.strip()
-df['ZIP2'] = df['ZIP2'].fillna(df['ZIP2'].mode()[0])
-df['ZIP2'] = df['ZIP2'].replace('UNHOUSED', df['ZIP Code:'].mode()[0])
-df['ZIP2'] = df['ZIP2'].replace('Texas', df['ZIP Code:'].mode()[0])
-df['ZIP2'] = df['ZIP2'].replace('nan', df['ZIP Code:'].mode()[0])
-df['ZIP2'] = df['ZIP2'].astype(str)
-df_z = df['ZIP2'].value_counts().reset_index(name='Count')
-# print(df_z.value_counts())
 
+# print("ZIP2 Unique Before:", df['ZIP 2'].unique().tolist())
+
+zip_unique =[
+78744, 78640, 78723, '', 78741, 78704, 78753, 78750, 78621, 78758, 78724, 78754, 78721, 78664, 78613, 78759, 78731, 78653, 78702, 78617, 78728, 78660, 78745, 78752, 78748, 78747, 78725, 78661, 78719, 78612, 76513, 78415, 78656, 78618, 'N/A', 78705, 78659, 78756, 78714, 78662, 76537, 78729, 78751, 78245, 78644, 78735, 'Texas', 78610, 78757, 78634, 75223, 'Unhoused', 78717, 'NA', 78749, 78727, 78683, 'Unknown', 'Unknown '
+]
+
+zip2_mode = df['ZIP2'].mode()[0]
+
+df['ZIP2'] = (
+    df['ZIP2']
+    .astype(str)
+    .str.strip()
+    .replace({
+        '': pd.NA,
+        'Texas': zip2_mode,
+        'Unhoused': zip2_mode,
+        'UNHOUSED': zip2_mode,
+        'Unknown': zip2_mode,
+        'Unknown ': zip2_mode,
+        'NA': zip2_mode,
+        'N/A': zip2_mode,
+        'nan': zip2_mode,
+    })
+)
+
+df['ZIP2'] = df['ZIP2'].fillna(zip2_mode)
+df_z = df['ZIP2'].value_counts().reset_index(name='Count')
+
+# print("ZIP2 Unique After:", df['ZIP Code:'].unique().tolist())
 
 zip_fig =px.bar(
     df_z,
@@ -1629,158 +1454,187 @@ zip_fig =px.bar(
 
 # ==================================== Folium =================================== #
 
-# mode_value = df['ZIP Code:'].mode()[0]
-# df['ZIP Code:'].fillna(mode_value, inplace=True)
-# df['ZIP Code:'] = df['ZIP Code:'].replace('nan', mode_value)
-# df['ZIP Code:'] = df['ZIP Code:'].replace("UNHOUSED", mode_value)
-# df['ZIP Code:'] = df['ZIP Code:'].astype('Int64')
-# df['ZIP Code:'] = df['ZIP Code:'].replace(-1, mode_value)
-# # df_q1['ZIP Code:'].fillna(df_q1['ZIP Code:'].mode()[0], inplace=True)
-# # print(df['ZIP Code:'].value_counts())
+print("Zip Unique Before:", df['ZIP Code:'].unique().tolist())
 
-# # Count of visitors by zip code
-# df_zip = df['ZIP Code:'].value_counts().reset_index(name='Residents')
-# df_zip['ZIP Code:'] = df_zip['ZIP Code:'].astype(int)
-# df_zip['Residents'] = df_zip['Residents'].astype(int)
+df = df[df['ZIP Code:'].str.strip() != ""]
 
-# # Create a folium map
-# m = folium.Map([30.2672, -97.7431], zoom_start=10)
+zip_unique =[
+78744, 78640, 78723, '', 78741, 78704, 78753, 78750, 78621, 78758, 78724, 78754, 78721, 78664, 78613, 78759, 78731, 78653, 78702, 78617, 78728, 78660, 78745, 78752, 78748, 78747, 78725, 78661, 78719, 78612, 76513, 78415, 78656, 78618, 'N/A', 78705, 78659, 78756, 78714, 78662, 76537, 78729, 78751, 78245, 78644, 78735, 'Texas', 78610, 78757, 78634, 75223, 'Unhoused', 78717, 'NA', 78749, 78727, 78683, 'Unknown', 'Unknown '
+]
 
-# # Add different tile sets
-# folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
-# folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+mode_value = df['ZIP Code:'].mode()[0]
+df['ZIP Code:'] = df['ZIP Code:'].fillna(mode_value)
 
-# # Available map styles
-# map_styles = {
-#     'OpenStreetMap': {
-#         'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-#     },
-#     'Stamen Terrain': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'Stamen Toner': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'Stamen Watercolor': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'CartoDB positron': {
-#         'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-#     },
-#     'CartoDB dark_matter': {
-#         'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-#     },
-#     'ESRI Imagery': {
-#         'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-#         'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-#     }
-# }
+df['ZIP2'] = (
+    df['ZIP2']
+    .astype(str)
+    .str.strip()
+    .replace({
+        '': pd.NA,
+        'Texas': zip2_mode,
+        'Unhoused': zip2_mode,
+        'UNHOUSED': zip2_mode,
+        'Unknown': zip2_mode,
+        'Unknown ': zip2_mode,
+        'NA': zip2_mode,
+        'N/A': zip2_mode,
+        'nan': zip2_mode,
+    })
+)
 
-# # Add tile layers to the map
-# for style, info in map_styles.items():
-#     folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
+print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
 
-# # Select a style
-# # selected_style = 'OpenStreetMap'
-# # selected_style = 'Stamen Terrain'
-# # selected_style = 'Stamen Toner'
-# # selected_style = 'Stamen Watercolor'
-# selected_style = 'CartoDB positron'
-# # selected_style = 'CartoDB dark_matter'
-# # selected_style = 'ESRI Imagery'
+# Count of visitors by zip code
+df['ZIP Code:'] = df['ZIP Code:'].where(df['ZIP Code:'].str.isdigit(), mode_value)
+df['ZIP Code:'] = df['ZIP Code:'].astype(int)
 
-# # Apply the selected style
-# if selected_style in map_styles:
-#     style_info = map_styles[selected_style]
-#     # print(f"Selected style: {selected_style}")
-#     folium.TileLayer(
-#         tiles=style_info['tiles'],
-#         attr=style_info['attribution'],
-#         name=selected_style
-#     ).add_to(m)
-# else:
-#     print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
-#      # Fallback to a default style
-#     folium.TileLayer('OpenStreetMap').add_to(m)
+df_zip = df['ZIP Code:'].value_counts().reset_index(name='Residents')
+# df_zip['ZIP Code:'] = df_zip['index'].astype(int)
+df_zip['Residents'] = df_zip['Residents'].astype(int)
+# df_zip.drop('index', axis=1, inplace=True)
 
-# # Function to get coordinates from zip code
-# def get_coordinates(zip_code):
-#     geolocator = Nominatim(user_agent="response_q4_2024.py")
-#     location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
-#     if location:
-#         return location.latitude, location.longitude
-#     else:
-#         print(f"Could not find coordinates for zip code: {zip_code}")
-#         return None, None
+# print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
 
-# # Apply function to dataframe to get coordinates
-# df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP Code:'].apply(get_coordinates))
+# print(df_zip.head())
 
-# # Filter out rows with NaN coordinates
-# df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
-# # print(df_zip.head())
-# # print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
-# # print(df_zip.isnull().sum())
+# Create a folium map
+m = folium.Map([30.2672, -97.7431], zoom_start=10)
 
-# # instantiate a feature group for the incidents in the dataframe
-# incidents = folium.map.FeatureGroup()
+# Add different tile sets
+folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
+folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
 
-# for index, row in df_zip.iterrows():
-#     lat, lng = row['Latitude'], row['Longitude']
+# Available map styles
+map_styles = {
+    'OpenStreetMap': {
+        'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    },
+    'Stamen Terrain': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'Stamen Toner': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'Stamen Watercolor': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'CartoDB positron': {
+        'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    },
+    'CartoDB dark_matter': {
+        'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    },
+    'ESRI Imagery': {
+        'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }
+}
 
-#     if pd.notna(lat) and pd.notna(lng):  
-#         incidents.add_child(# Check if both latitude and longitude are not NaN
-#         folium.vector_layers.CircleMarker(
-#             location=[lat, lng],
-#             radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
-#             color='blue',
-#             fill=True,
-#             fill_color='blue',
-#             fill_opacity=0.4
-#         ))
+# Add tile layers to the map
+for style, info in map_styles.items():
+    folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
 
-# # add pop-up text to each marker on the map
-# latitudes = list(df_zip['Latitude'])
-# longitudes = list(df_zip['Longitude'])
+# Select a style
+# selected_style = 'OpenStreetMap'
+# selected_style = 'Stamen Terrain'
+# selected_style = 'Stamen Toner'
+# selected_style = 'Stamen Watercolor'
+selected_style = 'CartoDB positron'
+# selected_style = 'CartoDB dark_matter'
+# selected_style = 'ESRI Imagery'
 
-# # labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
-# labels = df_zip.apply(lambda row: f"ZIP Code: {row['ZIP Code:']}, Patients: {row['Residents']}", axis=1)
+# Apply the selected style
+if selected_style in map_styles:
+    style_info = map_styles[selected_style]
+    # print(f"Selected style: {selected_style}")
+    folium.TileLayer(
+        tiles=style_info['tiles'],
+        attr=style_info['attribution'],
+        name=selected_style
+    ).add_to(m)
+else:
+    print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
+     # Fallback to a default style
+    folium.TileLayer('OpenStreetMap').add_to(m)
 
-# for lat, lng, label in zip(latitudes, longitudes, labels):
-#     if pd.notna(lat) and pd.notna(lng):
-#         folium.Marker([lat, lng], popup=label).add_to(m)
+# Function to get coordinates from zip code
+def get_coordinates(zip_code):
+    geolocator = Nominatim(user_agent="response_q4_2024.py")
+    location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
+    if location:
+        return location.latitude, location.longitude
+    else:
+        print(f"Could not find coordinates for zip code: {zip_code}")
+        return None, None
+
+# Apply function to dataframe to get coordinates
+df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP Code:'].apply(get_coordinates))
+
+# Filter out rows with NaN coordinates
+df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
+# print(df_zip.head())
+# print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
+# print(df_zip.isnull().sum())
+
+# instantiate a feature group for the incidents in the dataframe
+incidents = folium.map.FeatureGroup()
+
+for index, row in df_zip.iterrows():
+    lat, lng = row['Latitude'], row['Longitude']
+
+    if pd.notna(lat) and pd.notna(lng):  
+        incidents.add_child(# Check if both latitude and longitude are not NaN
+        folium.vector_layers.CircleMarker(
+            location=[lat, lng],
+            radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
+            color='blue',
+            fill=True,
+            fill_color='blue',
+            fill_opacity=0.4
+        ))
+
+# add pop-up text to each marker on the map
+latitudes = list(df_zip['Latitude'])
+longitudes = list(df_zip['Longitude'])
+
+# labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
+labels = df_zip.apply(lambda row: f"ZIP Code: {row['ZIP Code:']}, Patients: {row['Residents']}", axis=1)
+
+for lat, lng, label in zip(latitudes, longitudes, labels):
+    if pd.notna(lat) and pd.notna(lng):
+        folium.Marker([lat, lng], popup=label).add_to(m)
  
-# formatter = "function(num) {return L.Util.formatNum(num, 5);};"
-# mouse_position = MousePosition(
-#     position='topright',
-#     separator=' Long: ',
-#     empty_string='NaN',
-#     lng_first=False,
-#     num_digits=20,
-#     prefix='Lat:',
-#     lat_formatter=formatter,
-#     lng_formatter=formatter,
-# )
+formatter = "function(num) {return L.Util.formatNum(num, 5);};"
+mouse_position = MousePosition(
+    position='topright',
+    separator=' Long: ',
+    empty_string='NaN',
+    lng_first=False,
+    num_digits=20,
+    prefix='Lat:',
+    lat_formatter=formatter,
+    lng_formatter=formatter,
+)
 
-# m.add_child(mouse_position)
+m.add_child(mouse_position)
 
-# # add incidents to map
-# m.add_child(incidents)
+# add incidents to map
+m.add_child(incidents)
 
-# map_path = 'zip_code_map.html'
-# map_file = os.path.join(script_dir, map_path)
-# m.save(map_file)
-# map_html = open(map_file, 'r').read()
+map_path = 'zip_code_map.html'
+map_file = os.path.join(script_dir, map_path)
+m.save(map_file)
+map_html = open(map_file, 'r').read()
 
 # ========================== DataFrame Table ========================== #
 
@@ -1893,22 +1747,7 @@ html.Div(
             ],
         ),
         html.Div(
-            className='graph2',
-            children=[
-                dcc.Graph(
-                    figure=clients_served_fig
-                )
-            ]
-        ),
-    ]
-),
-
-# ROW 1
-html.Div(
-    className='row1',
-    children=[
-        html.Div(
-            className='graph11',
+            className='graph22',
             children=[
                 html.Div(
                     className='high1',
@@ -1922,7 +1761,7 @@ html.Div(
                             children=[
                                 html.H1(
                                     className='high3',
-                                    children=[df_duration]
+                                    children=[nav_hours]
                                 ),
                             ]
                         ),
@@ -1930,8 +1769,15 @@ html.Div(
                 ),
             ],
         ),
+    ]
+),
+
+# ROW 1
+html.Div(
+    className='row1',
+    children=[
         html.Div(
-            className='graph22',
+            className='graph11',
             children=[
                 html.Div(
                     className='high1',
@@ -1945,7 +1791,30 @@ html.Div(
                             children=[
                                 html.H1(
                                     className='high3',
-                                    # children=[df_travel]
+                                    children=[total_travel_time]
+                                ),
+                            ]
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        html.Div(
+            className='graph22',
+            children=[
+                html.Div(
+                    className='high1',
+                    children=[f'{current_quarter} Blank']
+                ),
+                html.Div(
+                    className='circle2',
+                    children=[
+                        html.Div(
+                            className='hilite',
+                            children=[
+                                html.H1(
+                                    className='high3',
+                                    # children=[total_travel_time]
                                 ),
                             ]
                         ),
@@ -1956,7 +1825,6 @@ html.Div(
     ]
 ),
 
-
 # ROW 5
 html.Div(
     className='row1',
@@ -1965,7 +1833,7 @@ html.Div(
             className='graph1',
             children=[
                 dcc.Graph(
-                    figure=race_fig
+                    figure=client_fig
                 )
             ]
         ),
@@ -1973,7 +1841,7 @@ html.Div(
             className='graph2',
             children=[
                 dcc.Graph(
-                    figure=race_fig_oct
+                    figure=client_pie
                 )
             ]
         )
@@ -1988,7 +1856,7 @@ html.Div(
             className='graph1',
             children=[
                 dcc.Graph(
-                    figure=race_fig_nov
+                    figure=travel_fig
                 )
             ]
         ),
@@ -1996,7 +1864,7 @@ html.Div(
             className='graph2',
             children=[
                 dcc.Graph(
-                    figure=race_fig_dec
+                    figure=travel_pie
                 )
             ]
         )
@@ -2019,30 +1887,7 @@ html.Div(
             className='graph2',
             children=[
                 dcc.Graph(
-                    figure=status_fig_oct
-                )
-            ]
-        )
-    ]
-),
-
-# ROW 5
-html.Div(
-    className='row1',
-    children=[
-        html.Div(
-            className='graph1',
-            children=[
-                dcc.Graph(
-                    figure=status_fig_nov
-                )
-            ]
-        ),
-        html.Div(
-            className='graph2',
-            children=[
-                dcc.Graph(
-                    figure=status_fig_dec
+                    figure=race_fig
                 )
             ]
         )
@@ -2063,20 +1908,7 @@ html.Div(
         )
     ]
 ),
-# ROW 9
-html.Div(
-    className='row3',
-    children=[
-        html.Div(
-            className='graph0',
-            children=[
-                dcc.Graph(
-                    figure=age_totals_fig
-                )
-            ]
-        )
-    ]
-),
+
 # ROW 9
 html.Div(
     className='row3',
@@ -2105,20 +1937,7 @@ html.Div(
         )
     ]
 ),
-# ROW 9
-html.Div(
-    className='row3',
-    children=[
-        html.Div(
-            className='graph0',
-            children=[
-                dcc.Graph(
-                    figure=support_totals_fig
-                )
-            ]
-        )
-    ]
-),
+
 # ROW 9
 html.Div(
     className='row3',
@@ -2141,13 +1960,13 @@ html.Div(
             className='graph0',
             children=[
                 dcc.Graph(
-                    # figure=insurance_fig
                     figure=insurance_fig
                 )
             ]
         )
     ]
 ),
+
 # ROW 9
 html.Div(
     className='row3',
@@ -2156,22 +1975,6 @@ html.Div(
             className='graph0',
             children=[
                 dcc.Graph(
-                    # figure=insurance_fig
-                    figure=insurance_totals_fig
-                )
-            ]
-        )
-    ]
-),
-# ROW 9
-html.Div(
-    className='row3',
-    children=[
-        html.Div(
-            className='graph0',
-            children=[
-                dcc.Graph(
-                    # figure=insurance_fig
                     figure=insurance_pie
                 )
             ]
@@ -2193,20 +1996,7 @@ html.Div(
         )
     ]
 ),
-# ROW 9
-html.Div(
-    className='row3',
-    children=[
-        html.Div(
-            className='graph0',
-            children=[
-                dcc.Graph(
-                    figure=location_totals_fig
-                )
-            ]
-        )
-    ]
-),
+
 # ROW 9
 html.Div(
     className='row3',
@@ -2235,19 +2025,7 @@ html.Div(
         )
     ]
 ),
-html.Div(
-    className='row3',
-    children=[
-        html.Div(
-            className='graph0',
-            children=[
-                dcc.Graph(
-                    figure=pf_totals_fig
-                )
-            ]
-        )
-    ]
-),
+
 html.Div(
     className='row3',
     children=[
@@ -2269,7 +2047,6 @@ html.Div(
         html.Div(
             className='graph0',
             children=[
-                # Horizontal Bar chart for zip code:
                 dcc.Graph(
                     figure=zip_fig
                 )
@@ -2292,7 +2069,7 @@ html.Div(
                 html.Iframe(
                     className='folium',
                     id='folium-map',
-                    # srcDoc=map_html
+                    srcDoc=map_html
                     # style={'border': 'none', 'width': '80%', 'height': '800px'}
                 )
             ]
