@@ -105,13 +105,13 @@
   border-bottom: 2px solid rgb(186, 186, 186);
 }
 
-.row4 {
+.row4 div {
   margin:0px 0px 20px 10px;
   display:flex;
   flex-direction: row;
   justify-content: center;
   text-align: center;
-  height: 1100px;
+  height: 1300px;
   border-bottom: 2px solid rgb(186, 186, 186);
 }
 
@@ -227,7 +227,7 @@
   margin: 0px 0px 0px 0px;
   padding: 20px 0px 0px 0px;
   width: 96%;
-  height: 800px;
+  height: 1300px;
 }
 
 .graph1 {

@@ -67,6 +67,9 @@ df = data.copy()
 # Get the reporting month:
 current_month = datetime(2025, 3, 1).strftime("%B")
 
+# get the reporting year:  
+report_year = datetime(2025, 3, 1).year
+
 df.columns = df.columns.str.strip()
 
 # Filtered df where 'Date of Activity:' is between 2025-01-01 and 2025-03-31
@@ -151,7 +154,9 @@ df.rename(
         "Individual's Insurance Status:": "Insurance",
         "Type of support given:": "Support",
         "Race/Ethnicity:" : "Ethnicity",
-        # "Individual's Status:": "Status",
+        "ZIP Code:" : "ZIP",
+        "Individual's Status:": "Status",
+        "Gender:": "Gender",
     }, 
 inplace=True)
 
@@ -469,17 +474,16 @@ travel_pie = px.pie(
 # ----------------------- New/ Returning Stattus DF ------------------------- #
 
 # Group by 'Individual\'s Status:' for all months and calculate percentages
-df_status = df['Individual\'s Status:'].value_counts().reset_index(name='Count')
+df_status = df['Status'].value_counts().reset_index(name='Count')
 df_status['Percentage'] = (df_status['Count'] / df_status['Count'].sum()) * 100
 df_status['Percentage'] = df_status['Percentage'].round(0)  # Round to nearest whole number
 
 # Pie chart
 status_fig = px.pie(
     df_status,
-    names='Individual\'s Status:',
+    names='Status',
     values='Count'
 ).update_layout(
-    title= f'{current_quarter} New vs. Returning',
     title_x=0.5,
     height=600,
     showlegend=True,
@@ -487,7 +491,12 @@ status_fig = px.pie(
         family='Calibri',
         size=17,
         color='black'
-    )
+    ),
+    title=dict(
+        text= f'{current_quarter} New vs. Returning Clients',  
+        font=dict(size=40),  
+        x=0.5  
+    ),
 ).update_traces(
     textinfo='percent+value',
     insidetextorientation='horizontal',  # Force text labels to be horizontal
@@ -673,6 +682,302 @@ age_pie = px.pie(
     textfont=dict(size=19),  # Increase text size in each bar
     textinfo='value+percent',
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
+)
+
+# -------------------------- Gender DF ------------------------- #
+
+df['Gender'] = (
+    df['Gender']
+        .astype(str)
+        .str.strip()
+        .replace({
+            "": pd.NA,
+        })
+)
+
+df_gender = df['Gender'].value_counts().reset_index(name='Count')
+# print(df_gender)
+
+df_gender_counts = (
+    df.groupby(['Month', 'Gender'], sort=False)
+    .size()
+    .reset_index(name='Count')
+)
+
+df_gender_counts['Month'] = pd.Categorical(
+    df_gender_counts['Month'], 
+    categories=months_in_quarter, 
+    ordered=True)
+
+# Sort the dataframe by 'Month' and 'Person submitting this form:'
+df_race_counts = df_gender_counts.sort_values(['Month', 'Gender'])
+
+# Create the grouped bar chart
+gender_fig = px.bar(
+    df_gender_counts,
+    x='Month',
+    y='Count',
+    color='Gender',
+    barmode='group', 
+    text='Count',
+    labels={
+        'Count': 'Count',
+        'Month': 'Month',
+        'Gender': 'Gender'
+    },
+).update_layout(
+    title_x=0.5,
+    xaxis_title='Month',
+    yaxis_title='Count',
+    height=650,  
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    title=dict(
+        text= f'{current_quarter} Sex Distribution By Month',  
+        font=dict(size=40),  
+        x=0.5  
+    ),
+    xaxis=dict(
+        title=dict(
+            text=None, 
+            standoff=100 #
+        ),
+        automargin=True,
+        tickfont=dict(size=25)
+    ),
+    yaxis=dict(
+        title=dict(
+            text='Count',
+            font=dict(size=25),
+        ),
+    ),
+    legend=dict(
+        title='',  # Legend title
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    bargap=0.08,  # Reduce the space between bars
+    bargroupgap=0,  # Reduce space between individual bars in groups
+    hovermode='x unified', # Display only one hover label per trace
+    margin=dict(l=0, r=0, t=100, b=0)
+).update_traces(
+    texttemplate='%{text}',  # Display the count value above bars
+    textfont=dict(size=20),  # Increase text size in each bar
+    textposition='outside',  # Automatically position text above bars
+    textangle=0, # Ensure text labels are horizontal
+    hovertemplate=(  # Custom hover template
+        '<br>'
+        '<b>Count: </b>%{y}' 
+    ),
+    customdata=df_gender_counts[['Gender']].values.tolist(),  # Add custom data for hover
+).add_vline(
+    x=0.5,  # Adjust the position of the line
+    line_dash="dash",
+    line_color="gray",
+    line_width=2
+).add_vline(
+    x=1.5,  # Position of the second line
+    line_dash="dash",
+    line_color="gray",
+    line_width=2
+).add_shape(
+    type="rect",
+    x0=-0.5,  # Start of the first group
+    x1=0.5,   # End of the first group
+    y0=0,     # Start of y-axis
+    y1=1,     # End of y-axis (relative to the chart area)
+    fillcolor="lightgray",
+    opacity=0.1,
+    layer="below"
+)
+
+gender_pie = px.pie(
+    df_gender,
+    names='Gender',
+    values='Count'
+).update_layout(
+    height=650,
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    title=dict(
+        text= f'{current_quarter} Gender Ratio',  
+        font=dict(size=40),  
+        x=0.5  # Center the title
+    ),
+    legend=dict(
+        # title='Administrative Activity',
+        title=None,
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    margin=dict(t=90, r=0, b=0, l=0),
+).update_traces(
+    textinfo='percent+value',
+    insidetextorientation='horizontal',  # Force text labels to be horizontal
+    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
+)
+
+# -------------------------- Race/ Ethnicity DF ------------------------- #
+
+df['Ethnicity'] = (
+    df['Ethnicity']
+        .astype(str)
+        .str.strip()
+        .replace({
+            "": pd.NA,
+            'Hispanic/Latino' : 'Hispanic/ Latino',
+            'White' : 'White/ European Ancestry',
+        })
+)
+
+df_race = df['Ethnicity'].value_counts().reset_index(name='Count')
+df_race['Percentage'] = (df_race['Count'] / df_race['Count'].sum()) * 100
+df_race['Percentage'] = df_race['Percentage'].round(0)  # Round to nearest whole number
+# print(df_race)
+
+df_race_counts = (
+    df.groupby(['Month', 'Ethnicity'], sort=False)
+    .size()
+    .reset_index(name='Count')
+)
+
+df_race_counts['Month'] = pd.Categorical(
+    df_race_counts['Month'], 
+    categories=months_in_quarter, 
+    ordered=True)
+
+# Sort the dataframe by 'Month' and 'Person submitting this form:'
+df_race_counts = df_race_counts.sort_values(['Month', 'Ethnicity'])
+
+# Create the grouped bar chart
+race_fig = px.bar(
+    df_race_counts,
+    x='Month',
+    y='Count',
+    color='Ethnicity',
+    barmode='group', 
+    text='Count',
+    labels={
+        'Count': 'Count',
+        'Month': 'Month',
+        'Ethnicity': 'Ethnicity'
+    },
+).update_layout(
+    title_x=0.5,
+    xaxis_title='Month',
+    yaxis_title='Count',
+    height=650,  
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    title=dict(
+        text= f'{current_quarter} Race/ Ethnicity Distribution By Month',  
+        font=dict(size=40),  
+        x=0.5  
+    ),
+    xaxis=dict(
+        title=dict(
+            text=None, 
+            standoff=100 #
+        ),
+        automargin=True,
+        tickfont=dict(size=25)
+    ),
+    yaxis=dict(
+        title=dict(
+            text='Count',
+            font=dict(size=25),
+        ),
+    ),
+    legend=dict(
+        title='',  # Legend title
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    bargap=0.08,  # Reduce the space between bars
+    bargroupgap=0,  # Reduce space between individual bars in groups
+    hovermode='x unified', # Display only one hover label per trace
+    margin=dict(l=0, r=0, t=100, b=0)
+).update_traces(
+    texttemplate='%{text}',  # Display the count value above bars
+    textfont=dict(size=20),  # Increase text size in each bar
+    textposition='outside',  # Automatically position text above bars
+    textangle=0, # Ensure text labels are horizontal
+    hovertemplate=(  # Custom hover template
+        '<br>'
+        '<b>Count: </b>%{y}' 
+    ),
+    customdata=df_race_counts[['Ethnicity']].values.tolist(),  # Add custom data for hover
+).add_vline(
+    x=0.5,  # Adjust the position of the line
+    line_dash="dash",
+    line_color="gray",
+    line_width=2
+).add_vline(
+    x=1.5,  # Position of the second line
+    line_dash="dash",
+    line_color="gray",
+    line_width=2
+).add_shape(
+    type="rect",
+    x0=-0.5,  # Start of the first group
+    x1=0.5,   # End of the first group
+    y0=0,     # Start of y-axis
+    y1=1,     # End of y-axis (relative to the chart area)
+    fillcolor="lightgray",
+    opacity=0.1,
+    layer="below"
+)
+
+race_pie = px.pie(
+    df_race,
+    names='Ethnicity',
+    values='Count'
+).update_layout(
+    height=650,
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    title=dict(
+        text= f'{current_quarter} Race/ Ethnicity Ratio',  
+        font=dict(size=40),  
+        x=0.5  # Center the title
+    ),
+    legend=dict(
+        # title='Administrative Activity',
+        title=None,
+        orientation="v",  # Vertical legend
+        x=1.05,  # Position legend to the right
+        xanchor="left",  # Anchor legend to the left
+        y=1,  # Position legend at the top
+        yanchor="top"  # Anchor legend at the top
+    ),
+    margin=dict(t=90, r=0, b=0, l=0),
+).update_traces(
+    textinfo='percent+value',
+    insidetextorientation='horizontal',  # Force text labels to be horizontal
+    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
+    texttemplate='%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
+    customdata=df_race['Percentage']  # Pass calculated percentage as custom data
 )
 
 # ------------------------ Type of Support Given DF --------------------------- #
@@ -1325,58 +1630,9 @@ pf_pie = px.pie(
     hovertemplate='<b>%{label}</b>: %{value}<extra></extra>'
 )
 
-# -------------------------- Race/ Ethnicity DF ------------------------- #
-
-df['Ethnicity'] = (
-    df['Ethnicity']
-        .astype(str)
-        .str.strip()
-        .replace({
-            "": pd.NA,
-            'Hispanic/Latino' : 'Hispanic/ Latino',
-            'White' : 'White/ European Ancestry',
-        })
-)
-
-df_race = df['Ethnicity'].value_counts().reset_index(name='Count')
-df_race['Percentage'] = (df_race['Count'] / df_race['Count'].sum()) * 100
-df_race['Percentage'] = df_race['Percentage'].round(0)  # Round to nearest whole number
-# print(df_race)
-
-race_fig = px.pie(
-    df_race,
-    names='Ethnicity',
-    values='Count'
-).update_layout(
-    title= f'{current_quarter} Client Visits by Race',
-    title_x=0.5,
-    height=550,
-    font=dict(
-        family='Calibri',
-        size=17,
-        color='black'
-    ),
-    legend=dict(
-        # title='Administrative Activity',
-        title=None,
-        orientation="v",  # Vertical legend
-        x=1.05,  # Position legend to the right
-        xanchor="left",  # Anchor legend to the left
-        y=1,  # Position legend at the top
-        yanchor="top"  # Anchor legend at the top
-    ),
-    margin=dict(l=0, r=0, t=50, b=0),
-).update_traces(
-    textinfo='percent+value',
-    insidetextorientation='horizontal',  # Force text labels to be horizontal
-    hovertemplate='<b>%{label}</b>: %{value}<extra></extra>',
-    texttemplate='%{value}<br>%{customdata:.0f}%',  # Using manually calculated percentage
-    customdata=df_race['Percentage']  # Pass calculated percentage as custom data
-)
-
 # ------------------------ ZIP2 DF ----------------------- #
 
-df['ZIP2'] = df['ZIP Code:']
+df['ZIP2'] = df['ZIP']
 
 # print("ZIP2 Unique Before:", df['ZIP 2'].unique().tolist())
 
@@ -1406,7 +1662,7 @@ df['ZIP2'] = (
 df['ZIP2'] = df['ZIP2'].fillna(zip2_mode)
 df_z = df['ZIP2'].value_counts().reset_index(name='Count')
 
-# print("ZIP2 Unique After:", df['ZIP Code:'].unique().tolist())
+# print("ZIP2 Unique After:", df['ZIP2'].unique().tolist())
 
 zip_fig =px.bar(
     df_z,
@@ -1416,11 +1672,12 @@ zip_fig =px.bar(
     text='Count',
     orientation='h'  # Horizontal bar chart
 ).update_layout(
-    title='Number of Visitors by Zip Code Q1',
+    title= f'{current_quarter} Visitors by Zip Code',
     xaxis_title='Residents',
     yaxis_title='Zip Code',
     title_x=0.5,
-    height=1100,
+    height=1500,
+    # width=1000,
     font=dict(
         family='Calibri',
         size=17,
@@ -1438,205 +1695,187 @@ zip_fig =px.bar(
         yanchor="top"  # Anchor legend at the top
     ),
 ).update_traces(
-    textposition='auto',  # Place text labels inside the bars
+    textposition='outside',  # Place text labels inside the bars
     textfont=dict(size=30),  # Increase text size in each bar
     # insidetextanchor='middle',  # Center text within the bars
     textangle=0,            # Ensure text labels are horizontal
     hovertemplate='<b>ZIP Code</b>: %{y}<br><b>Count</b>: %{x}<extra></extra>'
 )
 
-# =============================== Distinct Values ========================== #
-
-# Get the distinct values in column
-
-# distinct_service = df['What service did/did not complete?'].unique()
-# print('Distinct:\n', distinct_service)
-
 # ==================================== Folium =================================== #
 
-# print("Zip Unique Before:", df['ZIP Code:'].unique().tolist())
+# Standardize ZIP column to strings and strip whitespace
+# df['ZIP'] = df['ZIP'].astype(str).str.strip()
 
-df = df[df['ZIP Code:'].str.strip() != ""]
+# # print("Zip Unique Before:", df['ZIP'].unique().tolist())
+# # print("Null ZIP:", df['ZIP'].isnull().sum())
 
-zip_unique =[
-78744, 78640, 78723, '', 78741, 78704, 78753, 78750, 78621, 78758, 78724, 78754, 78721, 78664, 78613, 78759, 78731, 78653, 78702, 78617, 78728, 78660, 78745, 78752, 78748, 78747, 78725, 78661, 78719, 78612, 76513, 78415, 78656, 78618, 'N/A', 78705, 78659, 78756, 78714, 78662, 76537, 78729, 78751, 78245, 78644, 78735, 'Texas', 78610, 78757, 78634, 75223, 'Unhoused', 78717, 'NA', 78749, 78727, 78683, 'Unknown', 'Unknown '
-]
+# zip_unique = [
+# '78744', '78640', '78723', '', '78741', '78704', '78753', '78750', '78621', '78758', '78724', '78754', '78721', '78664', '78613', '78759', '78731', '78653', '78702', '78617', '78728', '78660', '78745', '78752', '78748', '78747', '78725', '78661', '78719', '78612', '76513', '78415', '78656', '78618', 'N/A', '78705', '78659', '78756', '78714', '78662', '76537', '78729', '78751', '78245', '78644', '78735', 'Texas', '78610', '78757', '78634', '75223', 'Unhoused', '78717', 'NA', '78749', '78727', '78683', 'Unknown'
+# ]
 
-mode_value = df['ZIP Code:'].mode()[0]
-df['ZIP Code:'] = df['ZIP Code:'].fillna(mode_value)
+# # Calculate most common valid ZIP (only numeric)
+# valid_zips = df['ZIP'][df['ZIP'].str.isnumeric()]
+# zip2_mode = valid_zips.mode()[0]
 
-df['ZIP2'] = (
-    df['ZIP2']
-    .astype(str)
-    .str.strip()
-    .replace({
-        '': pd.NA,
-        'Texas': zip2_mode,
-        'Unhoused': zip2_mode,
-        'UNHOUSED': zip2_mode,
-        'Unknown': zip2_mode,
-        'Unknown ': zip2_mode,
-        'NA': zip2_mode,
-        'N/A': zip2_mode,
-        'nan': zip2_mode,
-    })
-)
+# # Replace known invalid ZIP entries
+# invalid_zip_map = {
+#     '', ' ', 'Texas', 'Unhoused', 'UNHOUSED', 'Unknown', 'Unknown ', 
+#     'NA', '<NA>', 'N/A', 'nan', 'None', 'NaN'
+# }
+# df['ZIP'] = (
+#     df['ZIP'].replace({
+#     zip: zip2_mode for zip in invalid_zip_map
+# }))
 
-print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
+# # Convert to numeric and fill any remaining NaNs with mode
+# df['ZIP'] = pd.to_numeric(df['ZIP'], errors='coerce').fillna(zip2_mode).astype(int)
 
-df = df[df['ZIP Code:'].str.isdigit()]
+# # print("Zip Unique After:", df['ZIP'].unique().tolist())
 
-# Count of visitors by zip code
-# df['ZIP Code:'] = df['ZIP Code:'].where(df['ZIP Code:'].str.isdigit(), mode_value)
-df['ZIP Code:'] = df['ZIP Code:'].astype(int)
+# # Create ZIP summary
+# df_zip = df['ZIP'].value_counts().reset_index(name='Residents').rename(columns={'index': 'ZIP'})
+# # print("ZIP Value counts:", df['ZIP'].value_counts())
+# # print(df_zip.head())
 
-df_zip = df['ZIP Code:'].value_counts().reset_index(name='Residents')
-# df_zip['ZIP Code:'] = df_zip['index'].astype(int)
-df_zip['Residents'] = df_zip['Residents'].astype(int)
-# df_zip.drop('index', axis=1, inplace=True)
+# # Create a folium map
+# m = folium.Map([30.2672, -97.7431], zoom_start=10)
 
-# print("Zip Unique After:", df['ZIP Code:'].unique().tolist())
+# # Add different tile sets
+# folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
+# folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
 
-print(df_zip.head())
+# # Available map styles
+# map_styles = {
+#     'OpenStreetMap': {
+#         'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+#     },
+#     'Stamen Terrain': {
+#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+#     },
+#     'Stamen Toner': {
+#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
+#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+#     },
+#     'Stamen Watercolor': {
+#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+#     },
+#     'CartoDB positron': {
+#         'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+#     },
+#     'CartoDB dark_matter': {
+#         'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+#     },
+#     'ESRI Imagery': {
+#         'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+#         'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+#     }
+# }
 
-# Create a folium map
-m = folium.Map([30.2672, -97.7431], zoom_start=10)
+# # Add tile layers to the map
+# for style, info in map_styles.items():
+#     folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
 
-# Add different tile sets
-folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
-folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# # Select a style
+# # selected_style = 'OpenStreetMap'
+# # selected_style = 'Stamen Terrain'
+# # selected_style = 'Stamen Toner'
+# # selected_style = 'Stamen Watercolor'
+# selected_style = 'CartoDB positron'
+# # selected_style = 'CartoDB dark_matter'
+# # selected_style = 'ESRI Imagery'
 
-# Available map styles
-map_styles = {
-    'OpenStreetMap': {
-        'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    },
-    'Stamen Terrain': {
-        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
-        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-    },
-    'Stamen Toner': {
-        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
-        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-    },
-    'Stamen Watercolor': {
-        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
-        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-    },
-    'CartoDB positron': {
-        'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    },
-    'CartoDB dark_matter': {
-        'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    },
-    'ESRI Imagery': {
-        'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-    }
-}
+# # Apply the selected style
+# if selected_style in map_styles:
+#     style_info = map_styles[selected_style]
+#     # print(f"Selected style: {selected_style}")
+#     folium.TileLayer(
+#         tiles=style_info['tiles'],
+#         attr=style_info['attribution'],
+#         name=selected_style
+#     ).add_to(m)
+# else:
+#     print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
+#      # Fallback to a default style
+#     folium.TileLayer('OpenStreetMap').add_to(m)
 
-# Add tile layers to the map
-for style, info in map_styles.items():
-    folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
+# # Function to get coordinates from zip code
+# def get_coordinates(zip_code):
+#     geolocator = Nominatim(user_agent="response_q4_2024.py")
+#     location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
+#     if location:
+#         return location.latitude, location.longitude
+#     else:
+#         print(f"Could not find coordinates for zip code: {zip_code}")
+#         return None, None
 
-# Select a style
-# selected_style = 'OpenStreetMap'
-# selected_style = 'Stamen Terrain'
-# selected_style = 'Stamen Toner'
-# selected_style = 'Stamen Watercolor'
-selected_style = 'CartoDB positron'
-# selected_style = 'CartoDB dark_matter'
-# selected_style = 'ESRI Imagery'
+# # Apply function to dataframe to get coordinates
+# df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP'].apply(get_coordinates))
 
-# Apply the selected style
-if selected_style in map_styles:
-    style_info = map_styles[selected_style]
-    # print(f"Selected style: {selected_style}")
-    folium.TileLayer(
-        tiles=style_info['tiles'],
-        attr=style_info['attribution'],
-        name=selected_style
-    ).add_to(m)
-else:
-    print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
-     # Fallback to a default style
-    folium.TileLayer('OpenStreetMap').add_to(m)
+# # Filter out rows with NaN coordinates
+# df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
+# # print(df_zip.head())
+# # print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
+# # print(df_zip.isnull().sum())
 
-# Function to get coordinates from zip code
-def get_coordinates(zip_code):
-    geolocator = Nominatim(user_agent="response_q4_2024.py")
-    location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
-    if location:
-        return location.latitude, location.longitude
-    else:
-        print(f"Could not find coordinates for zip code: {zip_code}")
-        return None, None
+# # instantiate a feature group for the incidents in the dataframe
+# incidents = folium.map.FeatureGroup()
 
-# Apply function to dataframe to get coordinates
-df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP Code:'].apply(get_coordinates))
+# for index, row in df_zip.iterrows():
+#     lat, lng = row['Latitude'], row['Longitude']
 
-# Filter out rows with NaN coordinates
-df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
-# print(df_zip.head())
-# print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
-# print(df_zip.isnull().sum())
+#     if pd.notna(lat) and pd.notna(lng):  
+#         incidents.add_child(# Check if both latitude and longitude are not NaN
+#         folium.vector_layers.CircleMarker(
+#             location=[lat, lng],
+#             radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
+#             color='blue',
+#             fill=True,
+#             fill_color='blue',
+#             fill_opacity=0.4
+#         ))
 
-# instantiate a feature group for the incidents in the dataframe
-incidents = folium.map.FeatureGroup()
+# # add pop-up text to each marker on the map
+# latitudes = list(df_zip['Latitude'])
+# longitudes = list(df_zip['Longitude'])
 
-for index, row in df_zip.iterrows():
-    lat, lng = row['Latitude'], row['Longitude']
+# # labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
+# labels = df_zip.apply(lambda row: f"ZIP {row['ZIP']}, Patients: {row['Residents']}", axis=1)
 
-    if pd.notna(lat) and pd.notna(lng):  
-        incidents.add_child(# Check if both latitude and longitude are not NaN
-        folium.vector_layers.CircleMarker(
-            location=[lat, lng],
-            radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
-            color='blue',
-            fill=True,
-            fill_color='blue',
-            fill_opacity=0.4
-        ))
-
-# add pop-up text to each marker on the map
-latitudes = list(df_zip['Latitude'])
-longitudes = list(df_zip['Longitude'])
-
-# labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
-labels = df_zip.apply(lambda row: f"ZIP Code: {row['ZIP Code:']}, Patients: {row['Residents']}", axis=1)
-
-for lat, lng, label in zip(latitudes, longitudes, labels):
-    if pd.notna(lat) and pd.notna(lng):
-        folium.Marker([lat, lng], popup=label).add_to(m)
+# for lat, lng, label in zip(latitudes, longitudes, labels):
+#     if pd.notna(lat) and pd.notna(lng):
+#         folium.Marker([lat, lng], popup=label).add_to(m)
  
-formatter = "function(num) {return L.Util.formatNum(num, 5);};"
-mouse_position = MousePosition(
-    position='topright',
-    separator=' Long: ',
-    empty_string='NaN',
-    lng_first=False,
-    num_digits=20,
-    prefix='Lat:',
-    lat_formatter=formatter,
-    lng_formatter=formatter,
-)
+# formatter = "function(num) {return L.Util.formatNum(num, 5);};"
+# mouse_position = MousePosition(
+#     position='topright',
+#     separator=' Long: ',
+#     empty_string='NaN',
+#     lng_first=False,
+#     num_digits=20,
+#     prefix='Lat:',
+#     lat_formatter=formatter,
+#     lng_formatter=formatter,
+# )
 
-m.add_child(mouse_position)
+# m.add_child(mouse_position)
 
-# add incidents to map
-m.add_child(incidents)
+# # add incidents to map
+# m.add_child(incidents)
 
-map_path = 'zip_code_map.html'
-map_file = os.path.join(script_dir, map_path)
-m.save(map_file)
-map_html = open(map_file, 'r').read()
+# map_path = 'zip_code_map.html'
+# map_file = os.path.join(script_dir, map_path)
+# m.save(map_file)
+# map_html = open(map_file, 'r').read()
 
 # ========================== DataFrame Table ========================== #
 
@@ -1881,6 +2120,51 @@ html.Div(
             className='graph1',
             children=[
                 dcc.Graph(
+                    figure=race_fig
+                )
+            ]
+        ),
+        html.Div(
+            className='graph2',
+            children=[
+                dcc.Graph(
+                    figure=race_pie
+                )
+            ]
+        )
+    ]
+),
+
+# ROW 5
+html.Div(
+    className='row1',
+    children=[
+        html.Div(
+            className='graph1',
+            children=[
+                dcc.Graph(
+                    figure=gender_fig
+                )
+            ]
+        ),
+        html.Div(
+            className='graph2',
+            children=[
+                dcc.Graph(
+                    figure=gender_pie
+                )
+            ]
+        )
+    ]
+),
+
+html.Div(
+    className='row1',
+    children=[
+        html.Div(
+            className='graph1',
+            children=[
+                dcc.Graph(
                     figure=status_fig
                 )
             ]
@@ -1889,7 +2173,7 @@ html.Div(
             className='graph2',
             children=[
                 dcc.Graph(
-                    figure=race_fig
+                    # figure=
                 )
             ]
         )
@@ -2071,7 +2355,7 @@ html.Div(
                 html.Iframe(
                     className='folium',
                     id='folium-map',
-                    srcDoc=map_html
+                    # srcDoc=map_html
                     # style={'border': 'none', 'width': '80%', 'height': '800px'}
                 )
             ]
@@ -2095,9 +2379,9 @@ if __name__ == '__main__':
 
 # ----------------------------------------------- Updated Database ----------------------------------------
 
-# updated_path = 'data/q1_2025_cleaned.xlsx'
+# updated_path = f'data/Navigation_{current_quarter}_{report_year}.xlsx'
 # data_path = os.path.join(script_dir, updated_path)
-# df_q1.to_excel(data_path, index=False)
+# df.to_excel(data_path, index=False)
 # print(f"DataFrame saved to {data_path}")
 
 # updated_path1 = 'data/service_tracker_q4_2024_cleaned.csv'
