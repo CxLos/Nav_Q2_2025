@@ -478,8 +478,88 @@ df_status = df['Status'].value_counts().reset_index(name='Count')
 df_status['Percentage'] = (df_status['Count'] / df_status['Count'].sum()) * 100
 df_status['Percentage'] = df_status['Percentage'].round(0)  # Round to nearest whole number
 
+# print("Activity Status Unique before: \n", df['Activity Status'].unique().tolist())
+
+mode = df['Status'].mode()[0]
+df['Status'] = df['Status'].fillna(mode)
+
+df_status['Status'] = (
+    df_status['Status']
+    .str.strip()
+    .replace({
+        '': mode,
+    })
+)
+
+df_status_counts = (
+    df.groupby(['Month', 'Status'], sort=False)
+    .size()
+    .reset_index(name='Count')
+)
+
+df_status_counts['Month'] = pd.Categorical(
+    df_status_counts['Month'],
+    categories=months_in_quarter,
+    ordered=True
+)
+
+# print("Activity Status Unique after: \n", df['Activity Status'].unique().tolist())
+
+status_fig = px.bar(
+    df_status_counts,
+    x='Month',
+    y='Count',
+    color='Status',
+    barmode='group',
+    text='Count',
+    labels={
+        'Count': 'Number of Submissions',
+        'Month': 'Month',
+        'Status': 'Status'
+    }
+).update_layout(
+    title_x=0.5,
+    xaxis_title='Month',
+    yaxis_title='Count',
+    height=600,
+    font=dict(
+        family='Calibri',
+        size=17,
+        color='black'
+    ),
+    title=dict(
+        text= f'{current_quarter} New vs. Returning Status by Month',
+        x=0.5, 
+        font=dict(
+            size=35,
+            family='Calibri',
+            color='black',
+            )
+    ),
+    xaxis=dict(
+        tickmode='array',
+        tickvals=df_status_counts['Month'].unique(),
+        # showticklabels=False,
+        tickangle=-35
+    ),
+    legend=dict(
+        title='',
+        orientation="v",
+        x=1.05,
+        xanchor="left",
+        y=1,
+        yanchor="top"
+    ),
+    hovermode='x unified'
+).update_traces(
+    textfont=dict(size=25),  # Increase text size in each bar
+    textposition='outside',
+    hovertemplate='<br><b>Count: </b>%{y}<br>',
+    customdata=df_status_counts['Status'].values.tolist()
+)
+
 # Pie chart
-status_fig = px.pie(
+status_pie = px.pie(
     df_status,
     names='Status',
     values='Count'
@@ -1705,177 +1785,177 @@ zip_fig =px.bar(
 # ==================================== Folium =================================== #
 
 # Standardize ZIP column to strings and strip whitespace
-# df['ZIP'] = df['ZIP'].astype(str).str.strip()
+df['ZIP'] = df['ZIP'].astype(str).str.strip()
 
-# # print("Zip Unique Before:", df['ZIP'].unique().tolist())
-# # print("Null ZIP:", df['ZIP'].isnull().sum())
+# print("Zip Unique Before:", df['ZIP'].unique().tolist())
+# print("Null ZIP:", df['ZIP'].isnull().sum())
 
-# zip_unique = [
-# '78744', '78640', '78723', '', '78741', '78704', '78753', '78750', '78621', '78758', '78724', '78754', '78721', '78664', '78613', '78759', '78731', '78653', '78702', '78617', '78728', '78660', '78745', '78752', '78748', '78747', '78725', '78661', '78719', '78612', '76513', '78415', '78656', '78618', 'N/A', '78705', '78659', '78756', '78714', '78662', '76537', '78729', '78751', '78245', '78644', '78735', 'Texas', '78610', '78757', '78634', '75223', 'Unhoused', '78717', 'NA', '78749', '78727', '78683', 'Unknown'
-# ]
+zip_unique = [
+'78744', '78640', '78723', '', '78741', '78704', '78753', '78750', '78621', '78758', '78724', '78754', '78721', '78664', '78613', '78759', '78731', '78653', '78702', '78617', '78728', '78660', '78745', '78752', '78748', '78747', '78725', '78661', '78719', '78612', '76513', '78415', '78656', '78618', 'N/A', '78705', '78659', '78756', '78714', '78662', '76537', '78729', '78751', '78245', '78644', '78735', 'Texas', '78610', '78757', '78634', '75223', 'Unhoused', '78717', 'NA', '78749', '78727', '78683', 'Unknown'
+]
 
-# # Calculate most common valid ZIP (only numeric)
-# valid_zips = df['ZIP'][df['ZIP'].str.isnumeric()]
-# zip2_mode = valid_zips.mode()[0]
+# Calculate most common valid ZIP (only numeric)
+valid_zips = df['ZIP'][df['ZIP'].str.isnumeric()]
+zip2_mode = valid_zips.mode()[0]
 
-# # Replace known invalid ZIP entries
-# invalid_zip_map = {
-#     '', ' ', 'Texas', 'Unhoused', 'UNHOUSED', 'Unknown', 'Unknown ', 
-#     'NA', '<NA>', 'N/A', 'nan', 'None', 'NaN'
-# }
-# df['ZIP'] = (
-#     df['ZIP'].replace({
-#     zip: zip2_mode for zip in invalid_zip_map
-# }))
+# Replace known invalid ZIP entries
+invalid_zip_map = {
+    '', ' ', 'Texas', 'Unhoused', 'UNHOUSED', 'Unknown', 'Unknown ', 
+    'NA', '<NA>', 'N/A', 'nan', 'None', 'NaN'
+}
+df['ZIP'] = (
+    df['ZIP'].replace({
+    zip: zip2_mode for zip in invalid_zip_map
+}))
 
-# # Convert to numeric and fill any remaining NaNs with mode
-# df['ZIP'] = pd.to_numeric(df['ZIP'], errors='coerce').fillna(zip2_mode).astype(int)
+# Convert to numeric and fill any remaining NaNs with mode
+df['ZIP'] = pd.to_numeric(df['ZIP'], errors='coerce').fillna(zip2_mode).astype(int)
 
-# # print("Zip Unique After:", df['ZIP'].unique().tolist())
+# print("Zip Unique After:", df['ZIP'].unique().tolist())
 
-# # Create ZIP summary
-# df_zip = df['ZIP'].value_counts().reset_index(name='Residents').rename(columns={'index': 'ZIP'})
-# # print("ZIP Value counts:", df['ZIP'].value_counts())
-# # print(df_zip.head())
+# Create ZIP summary
+df_zip = df['ZIP'].value_counts().reset_index(name='Residents').rename(columns={'index': 'ZIP'})
+# print("ZIP Value counts:", df['ZIP'].value_counts())
+# print(df_zip.head())
 
-# # Create a folium map
-# m = folium.Map([30.2672, -97.7431], zoom_start=10)
+# Create a folium map
+m = folium.Map([30.2672, -97.7431], zoom_start=10)
 
-# # Add different tile sets
-# folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
-# folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
-# folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+# Add different tile sets
+folium.TileLayer('OpenStreetMap', attr='© OpenStreetMap contributors').add_to(m)
+folium.TileLayer('Stamen Terrain', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('Stamen Toner', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('Stamen Watercolor', attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('CartoDB positron', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
+folium.TileLayer('CartoDB dark_matter', attr='Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.').add_to(m)
 
-# # Available map styles
-# map_styles = {
-#     'OpenStreetMap': {
-#         'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-#     },
-#     'Stamen Terrain': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'Stamen Toner': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'Stamen Watercolor': {
-#         'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
-#         'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
-#     },
-#     'CartoDB positron': {
-#         'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-#     },
-#     'CartoDB dark_matter': {
-#         'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-#         'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-#     },
-#     'ESRI Imagery': {
-#         'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-#         'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-#     }
-# }
+# Available map styles
+map_styles = {
+    'OpenStreetMap': {
+        'tiles': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    },
+    'Stamen Terrain': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'Stamen Toner': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'Stamen Watercolor': {
+        'tiles': 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+        'attribution': 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    },
+    'CartoDB positron': {
+        'tiles': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    },
+    'CartoDB dark_matter': {
+        'tiles': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    },
+    'ESRI Imagery': {
+        'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }
+}
 
-# # Add tile layers to the map
-# for style, info in map_styles.items():
-#     folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
+# Add tile layers to the map
+for style, info in map_styles.items():
+    folium.TileLayer(tiles=info['tiles'], attr=info['attribution'], name=style).add_to(m)
 
-# # Select a style
-# # selected_style = 'OpenStreetMap'
-# # selected_style = 'Stamen Terrain'
-# # selected_style = 'Stamen Toner'
-# # selected_style = 'Stamen Watercolor'
-# selected_style = 'CartoDB positron'
-# # selected_style = 'CartoDB dark_matter'
-# # selected_style = 'ESRI Imagery'
+# Select a style
+# selected_style = 'OpenStreetMap'
+# selected_style = 'Stamen Terrain'
+# selected_style = 'Stamen Toner'
+# selected_style = 'Stamen Watercolor'
+selected_style = 'CartoDB positron'
+# selected_style = 'CartoDB dark_matter'
+# selected_style = 'ESRI Imagery'
 
-# # Apply the selected style
-# if selected_style in map_styles:
-#     style_info = map_styles[selected_style]
-#     # print(f"Selected style: {selected_style}")
-#     folium.TileLayer(
-#         tiles=style_info['tiles'],
-#         attr=style_info['attribution'],
-#         name=selected_style
-#     ).add_to(m)
-# else:
-#     print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
-#      # Fallback to a default style
-#     folium.TileLayer('OpenStreetMap').add_to(m)
+# Apply the selected style
+if selected_style in map_styles:
+    style_info = map_styles[selected_style]
+    # print(f"Selected style: {selected_style}")
+    folium.TileLayer(
+        tiles=style_info['tiles'],
+        attr=style_info['attribution'],
+        name=selected_style
+    ).add_to(m)
+else:
+    print(f"Selected style '{selected_style}' is not in the map styles dictionary.")
+     # Fallback to a default style
+    folium.TileLayer('OpenStreetMap').add_to(m)
 
-# # Function to get coordinates from zip code
-# def get_coordinates(zip_code):
-#     geolocator = Nominatim(user_agent="response_q4_2024.py")
-#     location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
-#     if location:
-#         return location.latitude, location.longitude
-#     else:
-#         print(f"Could not find coordinates for zip code: {zip_code}")
-#         return None, None
+# Function to get coordinates from zip code
+def get_coordinates(zip_code):
+    geolocator = Nominatim(user_agent="response_q4_2024.py")
+    location = geolocator.geocode({"postalcode": zip_code, "country": "USA"})
+    if location:
+        return location.latitude, location.longitude
+    else:
+        print(f"Could not find coordinates for zip code: {zip_code}")
+        return None, None
 
-# # Apply function to dataframe to get coordinates
-# df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP'].apply(get_coordinates))
+# Apply function to dataframe to get coordinates
+df_zip['Latitude'], df_zip['Longitude'] = zip(*df_zip['ZIP'].apply(get_coordinates))
 
-# # Filter out rows with NaN coordinates
-# df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
-# # print(df_zip.head())
-# # print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
-# # print(df_zip.isnull().sum())
+# Filter out rows with NaN coordinates
+df_zip = df_zip.dropna(subset=['Latitude', 'Longitude'])
+# print(df_zip.head())
+# print(df_zip[['Zip Code', 'Latitude', 'Longitude']].head())
+# print(df_zip.isnull().sum())
 
-# # instantiate a feature group for the incidents in the dataframe
-# incidents = folium.map.FeatureGroup()
+# instantiate a feature group for the incidents in the dataframe
+incidents = folium.map.FeatureGroup()
 
-# for index, row in df_zip.iterrows():
-#     lat, lng = row['Latitude'], row['Longitude']
+for index, row in df_zip.iterrows():
+    lat, lng = row['Latitude'], row['Longitude']
 
-#     if pd.notna(lat) and pd.notna(lng):  
-#         incidents.add_child(# Check if both latitude and longitude are not NaN
-#         folium.vector_layers.CircleMarker(
-#             location=[lat, lng],
-#             radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
-#             color='blue',
-#             fill=True,
-#             fill_color='blue',
-#             fill_opacity=0.4
-#         ))
+    if pd.notna(lat) and pd.notna(lng):  
+        incidents.add_child(# Check if both latitude and longitude are not NaN
+        folium.vector_layers.CircleMarker(
+            location=[lat, lng],
+            radius=row['Residents'] * 1.2,  # Adjust the multiplication factor to scale the circle size as needed,
+            color='blue',
+            fill=True,
+            fill_color='blue',
+            fill_opacity=0.4
+        ))
 
-# # add pop-up text to each marker on the map
-# latitudes = list(df_zip['Latitude'])
-# longitudes = list(df_zip['Longitude'])
+# add pop-up text to each marker on the map
+latitudes = list(df_zip['Latitude'])
+longitudes = list(df_zip['Longitude'])
 
-# # labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
-# labels = df_zip.apply(lambda row: f"ZIP {row['ZIP']}, Patients: {row['Residents']}", axis=1)
+# labels = list(df_zip[['Zip Code', 'Residents_In_Zip_Code']])
+labels = df_zip.apply(lambda row: f"ZIP {row['ZIP']}, Patients: {row['Residents']}", axis=1)
 
-# for lat, lng, label in zip(latitudes, longitudes, labels):
-#     if pd.notna(lat) and pd.notna(lng):
-#         folium.Marker([lat, lng], popup=label).add_to(m)
+for lat, lng, label in zip(latitudes, longitudes, labels):
+    if pd.notna(lat) and pd.notna(lng):
+        folium.Marker([lat, lng], popup=label).add_to(m)
  
-# formatter = "function(num) {return L.Util.formatNum(num, 5);};"
-# mouse_position = MousePosition(
-#     position='topright',
-#     separator=' Long: ',
-#     empty_string='NaN',
-#     lng_first=False,
-#     num_digits=20,
-#     prefix='Lat:',
-#     lat_formatter=formatter,
-#     lng_formatter=formatter,
-# )
+formatter = "function(num) {return L.Util.formatNum(num, 5);};"
+mouse_position = MousePosition(
+    position='topright',
+    separator=' Long: ',
+    empty_string='NaN',
+    lng_first=False,
+    num_digits=20,
+    prefix='Lat:',
+    lat_formatter=formatter,
+    lng_formatter=formatter,
+)
 
-# m.add_child(mouse_position)
+m.add_child(mouse_position)
 
-# # add incidents to map
-# m.add_child(incidents)
+# add incidents to map
+m.add_child(incidents)
 
-# map_path = 'zip_code_map.html'
-# map_file = os.path.join(script_dir, map_path)
-# m.save(map_file)
-# map_html = open(map_file, 'r').read()
+map_path = 'zip_code_map.html'
+map_file = os.path.join(script_dir, map_path)
+m.save(map_file)
+map_html = open(map_file, 'r').read()
 
 # ========================== DataFrame Table ========================== #
 
@@ -2173,7 +2253,7 @@ html.Div(
             className='graph2',
             children=[
                 dcc.Graph(
-                    # figure=
+                    figure=status_pie
                 )
             ]
         )
@@ -2355,7 +2435,7 @@ html.Div(
                 html.Iframe(
                     className='folium',
                     id='folium-map',
-                    # srcDoc=map_html
+                    srcDoc=map_html
                     # style={'border': 'none', 'width': '80%', 'height': '800px'}
                 )
             ]
