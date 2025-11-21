@@ -152,7 +152,7 @@ df.rename(
         "Total travel time (minutes):": "Travel Time",
         "Location Encountered:": "Location",
         "Individual's Insurance Status:": "Insurance",
-        "Type of Support Given:": "Support",
+        "Type of Coordination/Navigation Provided:": "Support",
         "Race / Ethnicity:" : "Ethnicity",
         "ZIP Code:" : "ZIP",
         "Individual's Status:": "Status",
